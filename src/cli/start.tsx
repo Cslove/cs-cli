@@ -5,6 +5,7 @@ import React from "react"
 import { App } from "../tui/app.js"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
+import fs from "node:fs"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -23,6 +24,16 @@ export async function start(options: StartOptions) {
   //    \x1b[3J   = 清除回滚缓冲区（scrollback），防止上滑看到旧内容
   //    \x1b[H    = 光标归位
   process.stdout.write("\x1b[?1049h\x1b[2J\x1b[3J\x1b[H")
+
+  // 兜底：process.exit() 会跳过 finally 块，但 process.on("exit") 回调仍会执行
+  // 用 fs.writeSync 保证同步写入，确保终端恢复
+  let restored = false
+  const restoreTerminal = () => {
+    if (restored) return
+    restored = true
+    fs.writeSync(1, "\x1b[?1049l")
+  }
+  process.on("exit", restoreTerminal)
 
   try {
     // 1. 拉起 Midway Server 子进程
@@ -61,27 +72,35 @@ export async function start(options: StartOptions) {
     })
 
     // 3. 渲染 Ink TUI（事件通过 SSE /global/event 订阅，不再需要 IPC）
-    //    TUI 独立运行，服务器断连只影响状态指示器，不会导致应用退出
-    const { waitUntilExit } = render(
+    //    exitOnCtrlC: false — 禁止 Ink 直接 process.exit()，确保 finally 块执行
+    const instance = render(
       <App
         serverUrl={serverUrl}
         project={options.project}
         model={options.model}
         sessionId={options.session}
       />,
+      { exitOnCtrlC: false },
     )
 
-    // 4. 等待 TUI 退出（用户主动退出，而非服务器断连）
-    await waitUntilExit()
+    // 4. Ctrl+C 手动退出：先 unmount Ink，再走正常退出流程
+    const onSigInt = () => {
+      process.off("SIGINT", onSigInt)
+      instance.unmount()
+    }
+    process.on("SIGINT", onSigInt)
 
-    // 5. 关闭 Server 子进程
+    // 5. 等待 TUI 退出（用户主动退出，而非服务器断连）
+    await instance.waitUntilExit()
+
+    // 6. 关闭 Server 子进程
     if (serverProcess.connected) {
       serverProcess.send({ type: "shutdown" })
     }
     await gracefulExit(serverProcess)
   } finally {
-    // 6. 切回主屏幕缓冲区（原始终端内容自动恢复）
-    process.stdout.write("\x1b[?1049l")
+    // 7. 切回主屏幕缓冲区（原始终端内容自动恢复）
+    restoreTerminal()
   }
 }
 
