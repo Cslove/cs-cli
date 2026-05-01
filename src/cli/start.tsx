@@ -37,7 +37,9 @@ export async function start(options: StartOptions) {
 
   try {
     // 1. 拉起 Midway Server 子进程
-    const serverProcess = fork(join(__dirname, "..", "server", "bootstrap.ts"), [], {
+    // tsx 环境下执行 .ts，node 编译后执行 .js，通过 process.argv 判断
+    const ext = process.argv[1]?.endsWith(".ts") ? ".ts" : ".js"
+    const serverProcess = fork(join(__dirname, "..", "server", `bootstrap${ext}`), [], {
       env: {
         ...process.env,
         CS_PROJECT: options.project,
