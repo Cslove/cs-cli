@@ -17,11 +17,13 @@ interface StartOptions {
 }
 
 export async function start(options: StartOptions) {
-  // 0. 切换到终端 Alternate Screen Buffer，进入后原始终端内容被隐藏
-  //    退出时恢复原始终端内容（与 vim/less/opencode 行为一致）
-  process.stdout.write("\x1b[?1049h")
-  // 清除备用屏幕可能残留的内容
-  process.stdout.write("\x1b[2J\x1b[H")
+  // 0. 进入 Alternate Screen Buffer + 清空 scrollback
+  //    必须在 render() 之前执行，确保 Ink 所有输出都进入备用屏幕
+  //    \x1b[?1049h = 切换到备用屏幕缓冲区
+  //    \x1b[2J   = 清除可见屏幕
+  //    \x1b[3J   = 清除回滚缓冲区（scrollback），防止上滑看到旧内容
+  //    \x1b[H    = 光标归位
+  process.stdout.write("\x1b[?1049h\x1b[2J\x1b[3J\x1b[H")
 
   try {
     // 1. 拉起 Midway Server 子进程
@@ -66,7 +68,7 @@ export async function start(options: StartOptions) {
     }
     await gracefulExit(serverProcess)
   } finally {
-    // 7. 恢复原始终端缓冲区
+    // 7. 切回主屏幕缓冲区（原始终端内容自动恢复）
     process.stdout.write("\x1b[?1049l")
   }
 }

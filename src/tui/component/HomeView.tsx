@@ -1,11 +1,24 @@
 import React from "react"
-import { Box, Text } from "ink"
+import { Box, Text, useInput } from "ink"
 import { useSession } from "../context/session.js"
 import { useRoute } from "../context/route.js"
+import { useToast } from "../context/toast.js"
 
 export function HomeView() {
   const { state, createSession } = useSession()
   const { navigate } = useRoute()
+  const toast = useToast()
+
+  useInput((ch, key) => {
+    if (ch === "n") {
+      toast.show({
+        title: "通知！",
+        message: "Sirong CLI is ready!",
+        variant: "info",
+        duration: 3000,
+      })
+    }
+  })
 
   const handleNewSession = async () => {
     const session = await createSession()
