@@ -29,7 +29,7 @@ export class LlmService {
     onComplete: (fullContent: string) => void
   }): Promise<string> {
     const client = this.getClient()
-    const model = options.model ?? process.env.SIRONG_MODEL ?? "gpt-4o"
+    const model = options.model ?? process.env.CS_MODEL ?? "gpt-4o"
 
     const stream = await client.chat.completions.create({
       model,

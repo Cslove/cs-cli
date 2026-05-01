@@ -4,7 +4,7 @@ import { readFile, writeFile, rename, rm, mkdir } from "node:fs/promises"
 import { join, dirname } from "node:path"
 import { homedir } from "node:os"
 
-const KV_DIR = join(homedir(), ".sirong")
+const KV_DIR = join(homedir(), ".cs")
 const KV_FILE = join(KV_DIR, "kv.json")
 
 type KVStore = Record<string, any>

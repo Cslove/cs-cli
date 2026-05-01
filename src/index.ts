@@ -5,7 +5,7 @@ import path from "node:path"
 const program = new Command()
 
 program
-  .name("sirong")
+  .name("cs")
   .description("A simple CLI agent powered by Midway + Ink")
   .version("0.1.0")
   .argument("[project]", "path to project directory", process.cwd())

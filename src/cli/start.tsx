@@ -40,9 +40,9 @@ export async function start(options: StartOptions) {
     const serverProcess = fork(join(__dirname, "..", "server", "bootstrap.ts"), [], {
       env: {
         ...process.env,
-        SIRONG_PROJECT: options.project,
-        SIRONG_MODEL: options.model ?? "gpt-4o",
-        SIRONG_PORT: String(options.port ?? 0),
+        CS_PROJECT: options.project,
+        CS_MODEL: options.model ?? "gpt-4o",
+        CS_PORT: String(options.port ?? 0),
       },
       stdio: ["pipe", "pipe", "pipe", "ipc"],
     })

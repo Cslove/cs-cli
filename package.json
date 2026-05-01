@@ -1,10 +1,10 @@
 {
-  "name": "sirong",
+  "name": "cs",
   "version": "0.1.0",
   "description": "A simple CLI agent powered by Midway + Ink",
   "type": "module",
   "bin": {
-    "sirong": "./dist/index.js"
+    "cs": "./dist/index.js"
   },
   "scripts": {
     "dev": "tsx src/index.ts",

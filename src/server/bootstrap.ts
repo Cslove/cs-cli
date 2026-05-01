@@ -29,7 +29,7 @@ async function main() {
     }
   } catch {
     // fallback: 尝试从环境变量读取
-    port = parseInt(process.env.SIRONG_PORT ?? "0", 10)
+    port = parseInt(process.env.CS_PORT ?? "0", 10)
   }
 
   // 通知主进程 Server 已就绪

@@ -23,7 +23,7 @@ export function HomeView() {
     if (ch === "n") {
       toast.show({
         title: "通知！",
-        message: "Sirong CLI is ready!",
+        message: "CS CLI is ready!",
         variant: "info",
         duration: 3000,
       })
@@ -50,7 +50,7 @@ export function HomeView() {
       </Box>
       <Box marginTop={1}>
         <Text bold color="magenta">
-          Sirong CLI
+          CS CLI
         </Text>
       </Box>
       <Text dimColor>A simple CLI agent</Text>

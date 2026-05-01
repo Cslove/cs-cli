@@ -1,6 +1,6 @@
-# Sirong CLI - 简易命令行 Agent 应用实现方案
+# CS CLI - 简易命令行 Agent 应用实现方案
 
-> 本文档参考 opencode 仓库的底层架构设计，为 "sirong" 命令行 Agent 应用起草最简易版实现方案。后端使用 Midway，TUI 使用 Ink。
+> 本文档参考 opencode 仓库的底层架构设计，为 "CS" 命令行 Agent 应用起草最简易版实现方案。后端使用 Midway，TUI 使用 Ink。
 
 ---
 
@@ -39,13 +39,13 @@ opencode 的核心架构模式：
 - **SDK Client 封装**：TUI 通过 SDK Client 与后端交互，而非直接调用 API。
 - **Event Bus**：通过 SSE/RPC 事件推送实现实时状态同步。
 
-### 1.2 Sirong 简化架构
+### 1.2 CS 简化架构
 
 ```
 ┌─────────────────────────────────────────────────────┐
 │                  CLI Entry (commander)               │
 │                         │                           │
-│                    sirong command                     │
+│                    CS command                     │
 │                         │                           │
 │              ┌──────────┴──────────┐                │
 │              ▼                     ▼                │
@@ -64,7 +64,7 @@ opencode 的核心架构模式：
 
 ### 1.3 与 opencode 的核心差异
 
-| 维度 | opencode | sirong |
+| 维度 | opencode | CS |
 |------|----------|--------|
 | 运行时 | Bun | Node.js |
 | CLI 框架 | yargs | commander |
@@ -81,7 +81,7 @@ opencode 的核心架构模式：
 ## 二、项目目录结构
 
 ```
-sirong/
+CS/
 ├── package.json
 ├── tsconfig.json
 ├── src/
@@ -132,7 +132,7 @@ sirong/
 对标 opencode 的 `thread.ts` + `worker.ts` 启动模式：
 
 ```
-用户执行 sirong 命令
+用户执行 CS 命令
         │
         ▼
   index.ts (commander 解析参数)
@@ -169,7 +169,7 @@ import { Command } from "commander"
 const program = new Command()
 
 program
-  .name("sirong")
+  .name("CS")
   .description("A simple CLI agent")
   .version("0.1.0")
   .argument("[project]", "path to project directory", process.cwd())
@@ -977,7 +977,7 @@ let db: Database.Database
 export async function initDatabase() {
   const dbPath = path.join(
     os.homedir(),
-    ".sirong",
+    ".CS",
     "data.db"
   )
   db = new Database(dbPath)
@@ -1103,7 +1103,7 @@ npx nodemon --exec tsx src/index.ts
 npx tsc
 
 # 使用 pkg 打包为独立可执行文件
-npx pkg dist/index.js --targets node18 --output sirong
+npx pkg dist/index.js --targets node18 --output CS
 ```
 
 ### 10.3 全局安装
@@ -1113,17 +1113,17 @@ npx pkg dist/index.js --targets node18 --output sirong
 npm link
 
 # 之后即可直接使用
-sirong
-sirong /path/to/project
-sirong -m gpt-4o
-sirong -s <session-id>
+CS
+CS /path/to/project
+CS -m gpt-4o
+CS -s <session-id>
 ```
 
 ---
 
 ## 十一、架构对标总结
 
-| opencode 模块 | sirong 对应 | 文件位置 |
+| opencode 模块 | CS 对应 | 文件位置 |
 |---|---|---|
 | `src/index.ts` (yargs CLI) | `src/index.ts` (commander CLI) | 入口 |
 | `src/cli/cmd/tui/thread.ts` | `src/cli/start.ts` | 启动编排 |

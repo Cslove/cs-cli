@@ -58,8 +58,8 @@ export class SessionService {
     const session: SessionEntity = {
       id: uuid(),
       title: title ?? "New Session",
-      model: process.env.SIRONG_MODEL ?? "gpt-4o",
-      project_path: process.env.SIRONG_PROJECT ?? "",
+      model: process.env.CS_MODEL ?? "gpt-4o",
+      project_path: process.env.CS_PROJECT ?? "",
       created_at: now,
       updated_at: now,
     }

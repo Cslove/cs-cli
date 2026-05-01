@@ -8,7 +8,7 @@ let dbPath: string
 
 // 对标 opencode 的 storage/storage.ts —— 简化版 SQLite 存储（sql.js WASM）
 export async function initDatabase() {
-  const dbDir = path.join(os.homedir(), ".sirong")
+  const dbDir = path.join(os.homedir(), ".cs")
   if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true })
   }
