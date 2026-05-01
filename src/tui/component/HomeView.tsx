@@ -1,4 +1,4 @@
-import React from "react"
+import React, { useState, useEffect } from "react"
 import { Box, Text, useInput } from "ink"
 import { useSession } from "../context/session.js"
 import { useRoute } from "../context/route.js"
@@ -10,8 +10,14 @@ export function HomeView() {
   const { state, createSession } = useSession()
   const { navigate } = useRoute()
   const toast = useToast()
-  const { connected } = useEvent()
+  const { connected, on } = useEvent()
   const api = useApi()
+  const [greetings, setGreetings] = useState<string[]>([])
+
+  useEffect(() => on("greeting", (data) => {
+    const msg = (data as { message: string }).message
+    setGreetings((prev) => [...prev.slice(-9), msg])
+  }), [on])
 
   useInput((ch, key) => {
     if (ch === "n") {
@@ -51,6 +57,14 @@ export function HomeView() {
       <Box marginTop={1}>
         <Text color="cyan">Press Enter to start a new session</Text>
       </Box>
+      {greetings.length > 0 && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold>Greetings:</Text>
+          {greetings.map((g, i) => (
+            <Text key={i} color="yellow">  {g}</Text>
+          ))}
+        </Box>
+      )}
       {state.list.length > 0 && (
         <Box flexDirection="column" marginTop={1}>
           <Text bold>Recent Sessions:</Text>

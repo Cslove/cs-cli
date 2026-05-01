@@ -3,6 +3,24 @@ import { Controller, Get, Inject } from "@midwayjs/core"
 import { Context } from "@midwayjs/koa"
 import { EventService } from "../service/event.js"
 
+const GREETINGS = [
+  "Hello, World! 🌍",
+  "你好呀 👋",
+  "Keep coding! 💻",
+  "Stay curious! 🔍",
+  "Built different 🏗️",
+  "Ship it! 🚀",
+  "Debug like a detective 🕵️",
+  "Git push --force? No! 🙅",
+  "rm -rf / ...just kidding 😄",
+  "Coffee first ☕",
+  "It works on my machine 🤷",
+  "404: Motivation not found 😴",
+  "console.log debugger 🐛",
+  "Tabs or spaces? Both 💥",
+  "sudo fix everything 🔧",
+]
+
 @Controller("/global")
 export class GlobalController {
   @Inject()
@@ -48,12 +66,21 @@ export class GlobalController {
       payload: { type: "server.connected", properties: {} },
     }))
 
-    // 2. heartbeat
+    // 2. heartbeat 每 10s
     const heartbeat = setInterval(() => {
       writeSSE(JSON.stringify({
         payload: { type: "server.heartbeat", properties: {} },
       }))
     }, 10_000)
+
+    // 2.5 随机打招呼 每 3s
+    const greeting = setInterval(() => {
+      const msg = GREETINGS[Math.floor(Math.random() * GREETINGS.length)]
+      writeSSE(JSON.stringify({
+        directory: "global",
+        payload: { type: "greeting", properties: { message: msg } },
+      }))
+    }, 3_000)
 
     // 3. 订阅 EventService 事件
     const handler = (data: unknown) => {
@@ -67,6 +94,7 @@ export class GlobalController {
     // 4. 清理函数
     const cleanup = () => {
       clearInterval(heartbeat)
+      clearInterval(greeting)
       this.eventService.off("event", handler)
       if (!res.writableEnded) res.end()
     }
