@@ -1,31 +1,88 @@
-// 对标 opencode 的 context/event.ts + context/sdk.tsx 中的 SSE 逻辑 —— IPC 事件 Context
-import React, { createContext, useContext, useEffect, useRef, useCallback } from "react"
-import type { IpcBridge } from "../../shared/ipc.js"
+// 对标 opencode 的 context/sdk.tsx 中的 SSE 逻辑 —— 事件 Context
+// 从 IPC 订阅改为 HTTP SSE 订阅，对标 opencode 的 sdk.global.event()
+import React, { createContext, useContext, useEffect, useRef, useCallback, useState } from "react"
+import { useApi, type GlobalEvent } from "./api.js"
 
 type EventHandler = (data: unknown) => void
 
 interface EventContextValue {
   on: (event: string, handler: EventHandler) => () => void
   off: (event: string, handler: EventHandler) => void
+  /** SSE 连接状态 */
+  connected: boolean
 }
 
 const EventCtx = createContext<EventContextValue | null>(null)
 
-export function EventProvider({ ipcBridge, children }: { ipcBridge: IpcBridge; children: React.ReactNode }) {
+export function EventProvider({ children }: { children: React.ReactNode }) {
+  const api = useApi()
   const listeners = useRef<Map<string, Set<EventHandler>>>(new Map())
+  const [connected, setConnected] = useState(false)
 
   useEffect(() => {
-    const unsubscribe = ipcBridge.on("event", (msg: unknown) => {
-      const { event, data } = msg as { event: string; data: unknown }
-      const handlers = listeners.current.get(event)
-      if (handlers) {
-        for (const handler of handlers) {
-          handler(data)
+    const abort = new AbortController()
+    let attempt = 0
+    const retryDelay = 1000
+    const maxRetryDelay = 30000
+    let stopped = false
+    let heartbeatTimer: NodeJS.Timeout | undefined
+
+    // 收到 server.connected 或 server.heartbeat 时标记连接正常
+    function markConnected() {
+      setConnected(true)
+      // 15s 内没收到下一个心跳就判定断连（服务端每 10s 发一次）
+      if (heartbeatTimer) clearTimeout(heartbeatTimer)
+      heartbeatTimer = setTimeout(() => {
+        if (!stopped) setConnected(false)
+      }, 15_000)
+    }
+
+    // 对标 opencode 的 startSSE() —— 指数退避重连
+    async function startSSE() {
+      while (!stopped) {
+        try {
+          const stream = api.global.event(abort.signal)
+          for await (const event of stream) {
+            if (stopped) break
+            // server.connected / server.heartbeat 表示连接正常
+            if (event.payload.type === "server.connected" || event.payload.type === "server.heartbeat") {
+              markConnected()
+            }
+            dispatchEvent(event)
+          }
+        } catch {
+          if (stopped) break
         }
+
+        // SSE 流断开，标记断连
+        setConnected(false)
+        if (heartbeatTimer) clearTimeout(heartbeatTimer)
+
+        attempt += 1
+        const backoff = Math.min(retryDelay * 2 ** (attempt - 1), maxRetryDelay)
+        await new Promise((resolve) => setTimeout(resolve, backoff))
       }
-    })
-    return unsubscribe
-  }, [ipcBridge])
+    }
+
+    startSSE().catch(() => {})
+
+    return () => {
+      stopped = true
+      abort.abort()
+      if (heartbeatTimer) clearTimeout(heartbeatTimer)
+    }
+  }, [api])
+
+  // 分发事件到对应 handler
+  function dispatchEvent(event: GlobalEvent) {
+    const { type, properties } = event.payload
+    const handlers = listeners.current.get(type)
+    if (handlers) {
+      for (const handler of handlers) {
+        handler(properties)
+      }
+    }
+  }
 
   const on = useCallback((event: string, handler: EventHandler) => {
     if (!listeners.current.has(event)) {
@@ -41,7 +98,7 @@ export function EventProvider({ ipcBridge, children }: { ipcBridge: IpcBridge; c
     listeners.current.get(event)?.delete(handler)
   }, [])
 
-  return <EventCtx.Provider value={{ on, off }}>{children}</EventCtx.Provider>
+  return <EventCtx.Provider value={{ on, off, connected }}>{children}</EventCtx.Provider>
 }
 
 export function useEvent() {

@@ -103,8 +103,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       try {
         await api.chat.prompt(state.current.id, content)
         // streaming 完成后由事件触发 ADD_MESSAGE 和 SET_LOADING
-      } catch {
+      } catch (e) {
         dispatch({ type: "SET_LOADING", loading: false })
+        throw e
       }
     },
     [api, state.current],

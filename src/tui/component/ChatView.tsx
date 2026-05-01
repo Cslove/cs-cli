@@ -2,6 +2,7 @@ import React, { useState } from "react"
 import { Box, Text, useInput } from "ink"
 import { useSession } from "../context/session.js"
 import { useRoute } from "../context/route.js"
+import { useToast } from "../context/toast.js"
 import { MessageList } from "./MessageList.js"
 import { InputBar } from "./InputBar.js"
 import { StatusBar } from "./StatusBar.js"
@@ -9,6 +10,7 @@ import { StatusBar } from "./StatusBar.js"
 export function ChatView({ model }: { model?: string }) {
   const { state, sendMessage, createSession } = useSession()
   const { navigate } = useRoute()
+  const toast = useToast()
   const [input, setInput] = useState("")
 
   useInput((ch, key) => {
@@ -25,11 +27,15 @@ export function ChatView({ model }: { model?: string }) {
       const content = input.trim()
       setInput("")
       if (!state.current) {
-        createSession().then((s) => {
+        createSession().then(() => {
           sendMessage(content)
+        }).catch((e) => {
+          toast.error(e)
         })
       } else {
-        sendMessage(content)
+        sendMessage(content).catch((e) => {
+          toast.error(e)
+        })
       }
     } else if (key.backspace || key.delete) {
       setInput((prev) => prev.slice(0, -1))

@@ -3,7 +3,6 @@ import { fork, type ChildProcess } from "node:child_process"
 import { render } from "ink"
 import React from "react"
 import { App } from "../tui/app.js"
-import { createIpcBridge } from "../shared/ipc.js"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -37,38 +36,51 @@ export async function start(options: StartOptions) {
       stdio: ["pipe", "pipe", "pipe", "ipc"],
     })
 
-    // 转发子进程 stderr 到主进程（用于调试）
-    serverProcess.stderr?.on("data", (data: Buffer) => {
-      process.stderr.write(data)
+    // 缓冲子进程日志（不直接转发，避免冲掉 Ink TUI 渲染）
+    // 仅在子进程异常退出时输出缓冲内容用于调试
+    let logBuf = ""
+    serverProcess.stdout?.on("data", (data: Buffer) => { logBuf += data.toString() })
+    serverProcess.stderr?.on("data", (data: Buffer) => { logBuf += data.toString() })
+
+    serverProcess.on("exit", (code) => {
+      if (code !== 0 && code !== null && logBuf) {
+        process.stderr.write(`\n[server] exited with code ${code}:\n${logBuf}\n`)
+      }
     })
 
     // 2. 等待 Server 就绪
     const serverUrl = await waitForServerReady(serverProcess)
 
-    // 3. 创建 IPC 通信桥接
-    const ipcBridge = createIpcBridge(serverProcess)
+    // 服务器启动后，子进程退出不再影响 TUI
+    // SSE 断连会通过 EventProvider 的 connected 状态反映到 HomeView
+    serverProcess.removeAllListeners("exit")
+    serverProcess.on("exit", (code) => {
+      if (code !== 0 && code !== null && logBuf) {
+        process.stderr.write(`\n[server] exited with code ${code}:\n${logBuf}\n`)
+      }
+    })
 
-    // 4. 渲染 Ink TUI
+    // 3. 渲染 Ink TUI（事件通过 SSE /global/event 订阅，不再需要 IPC）
+    //    TUI 独立运行，服务器断连只影响状态指示器，不会导致应用退出
     const { waitUntilExit } = render(
       <App
         serverUrl={serverUrl}
-        ipcBridge={ipcBridge}
         project={options.project}
         model={options.model}
         sessionId={options.session}
       />,
     )
 
-    // 5. 等待 TUI 退出
+    // 4. 等待 TUI 退出（用户主动退出，而非服务器断连）
     await waitUntilExit()
 
-    // 6. 关闭 Server 子进程
+    // 5. 关闭 Server 子进程
     if (serverProcess.connected) {
       serverProcess.send({ type: "shutdown" })
     }
     await gracefulExit(serverProcess)
   } finally {
-    // 7. 切回主屏幕缓冲区（原始终端内容自动恢复）
+    // 6. 切回主屏幕缓冲区（原始终端内容自动恢复）
     process.stdout.write("\x1b[?1049l")
   }
 }

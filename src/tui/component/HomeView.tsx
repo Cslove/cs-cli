@@ -3,11 +3,15 @@ import { Box, Text, useInput } from "ink"
 import { useSession } from "../context/session.js"
 import { useRoute } from "../context/route.js"
 import { useToast } from "../context/toast.js"
+import { useEvent } from "../context/event.js"
+import { useApi } from "../context/api.js"
 
 export function HomeView() {
   const { state, createSession } = useSession()
   const { navigate } = useRoute()
   const toast = useToast()
+  const { connected } = useEvent()
+  const api = useApi()
 
   useInput((ch, key) => {
     if (ch === "n") {
@@ -21,15 +25,28 @@ export function HomeView() {
   })
 
   const handleNewSession = async () => {
-    const session = await createSession()
-    navigate({ type: "session", sessionId: session.id })
+    try {
+      const session = await createSession()
+      navigate({ type: "session", sessionId: session.id })
+    } catch (e) {
+      toast.error(e)
+    }
   }
 
   return (
     <Box flexDirection="column" padding={1}>
-      <Text bold color="magenta">
-        Sirong CLI
-      </Text>
+      {/* 服务器连接状态指示器 */}
+      <Box flexDirection="row" gap={1}>
+        <Text color={connected ? "green" : "red"}>{connected ? "●" : "●"}</Text>
+        <Text dimColor>{connected ? "Connected" : "Lost server connection"}</Text>
+        <Text dimColor>|</Text>
+        <Text dimColor>{api.serverUrl}</Text>
+      </Box>
+      <Box marginTop={1}>
+        <Text bold color="magenta">
+          Sirong CLI
+        </Text>
+      </Box>
       <Text dimColor>A simple CLI agent</Text>
       <Box marginTop={1}>
         <Text color="cyan">Press Enter to start a new session</Text>

@@ -11,7 +11,7 @@ program
   .argument("[project]", "path to project directory", process.cwd())
   .option("-m, --model <model>", "model to use (e.g. gpt-4o)", "gpt-4o")
   .option("-s, --session <id>", "resume a session by id")
-  .option("--port <port>", "server port (default: random)", "9527")
+  .option("--port <port>", "server port (default: random)", "0")
   .action(async (project, options) => {
     const resolvedProject = path.resolve(project)   
     const { start } = await import("./cli/start.js")

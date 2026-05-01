@@ -9,21 +9,19 @@ import { KVProvider } from "./context/kv.js"
 import { ToastProvider, Toast } from "./context/toast.js"
 import { ChatView } from "./component/ChatView.js"
 import { HomeView } from "./component/HomeView.js"
-import type { IpcBridge } from "../shared/ipc.js"
 
 interface AppProps {
   serverUrl: string
-  ipcBridge: IpcBridge
   project: string
   model?: string
   sessionId?: string
 }
 
 export function App(props: AppProps) {
-  // 对标 opencode 的 Provider 嵌套顺序：KVProvider → ToastProvider → ...
+  // 对标 opencode 的 Provider 嵌套顺序：SDKProvider → KVProvider → ToastProvider → ...
   return (
     <ApiProvider serverUrl={props.serverUrl}>
-      <EventProvider ipcBridge={props.ipcBridge}>
+      <EventProvider>
         <KVProvider>
           <ToastProvider>
             <SessionProvider>
