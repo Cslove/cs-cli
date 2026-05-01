@@ -1,5 +1,5 @@
 // 对标 opencode 的 cli/cmd/tui/worker.ts —— 子进程入口
-import { initializeGlobalApplicationContext } from "@midwayjs/core"
+import { initializeGlobalApplicationContext, MidwayApplicationManager } from "@midwayjs/core"
 import { dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -10,15 +10,13 @@ async function main() {
     baseDir: __dirname,
   })
 
-  // 从 Midway 容器获取 Koa Application，再取实际监听端口
+  // 通过 MidwayApplicationManager 获取 Koa Framework，再取实际监听端口
   let port = 0
   try {
-    const koaApp = (container as any).getServer?.("koaServer")
-    const httpServer = koaApp?.getServer?.() ?? koaApp?.server
-    const addr = httpServer?.address?.()
-    if (typeof addr === "object" && addr) {
-      port = addr.port
-    }
+    const appManager = await container.getAsync(MidwayApplicationManager)
+    const framework = appManager.getFramework("koa") as any
+    const addr = framework.getServer().address()
+    if (typeof addr === "object" && addr) port = addr.port
   } catch {
     // fallback: 尝试从环境变量读取
     port = parseInt(process.env.SIRONG_PORT ?? "0", 10)

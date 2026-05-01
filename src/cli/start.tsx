@@ -17,47 +17,58 @@ interface StartOptions {
 }
 
 export async function start(options: StartOptions) {
-  // 1. 拉起 Midway Server 子进程
-  const serverProcess = fork(join(__dirname, "..", "server", "bootstrap.ts"), [], {
-    env: {
-      ...process.env,
-      SIRONG_PROJECT: options.project,
-      SIRONG_MODEL: options.model ?? "gpt-4o",
-      SIRONG_PORT: String(options.port ?? 0),
-    },
-    stdio: ["pipe", "pipe", "pipe", "ipc"],
-  })
+  // 0. 切换到终端 Alternate Screen Buffer，进入后原始终端内容被隐藏
+  //    退出时恢复原始终端内容（与 vim/less/opencode 行为一致）
+  process.stdout.write("\x1b[?1049h")
+  // 清除备用屏幕可能残留的内容
+  process.stdout.write("\x1b[2J\x1b[H")
 
-  // 转发子进程 stderr 到主进程（用于调试）
-  serverProcess.stderr?.on("data", (data: Buffer) => {
-    process.stderr.write(data)
-  })
+  try {
+    // 1. 拉起 Midway Server 子进程
+    const serverProcess = fork(join(__dirname, "..", "server", "bootstrap.ts"), [], {
+      env: {
+        ...process.env,
+        SIRONG_PROJECT: options.project,
+        SIRONG_MODEL: options.model ?? "gpt-4o",
+        SIRONG_PORT: String(options.port ?? 0),
+      },
+      stdio: ["pipe", "pipe", "pipe", "ipc"],
+    })
 
-  // 2. 等待 Server 就绪
-  const serverUrl = await waitForServerReady(serverProcess)
+    // 转发子进程 stderr 到主进程（用于调试）
+    serverProcess.stderr?.on("data", (data: Buffer) => {
+      process.stderr.write(data)
+    })
 
-  // 3. 创建 IPC 通信桥接
-  const ipcBridge = createIpcBridge(serverProcess)
+    // 2. 等待 Server 就绪
+    const serverUrl = await waitForServerReady(serverProcess)
 
-  // 4. 渲染 Ink TUI
-  const { waitUntilExit } = render(
-    <App
-      serverUrl={serverUrl}
-      ipcBridge={ipcBridge}
-      project={options.project}
-      model={options.model}
-      sessionId={options.session}
-    />,
-  )
+    // 3. 创建 IPC 通信桥接
+    const ipcBridge = createIpcBridge(serverProcess)
 
-  // 5. 等待 TUI 退出
-  await waitUntilExit()
+    // 4. 渲染 Ink TUI
+    const { waitUntilExit } = render(
+      <App
+        serverUrl={serverUrl}
+        ipcBridge={ipcBridge}
+        project={options.project}
+        model={options.model}
+        sessionId={options.session}
+      />,
+    )
 
-  // 6. 关闭 Server 子进程
-  if (serverProcess.connected) {
-    serverProcess.send({ type: "shutdown" })
+    // 5. 等待 TUI 退出
+    await waitUntilExit()
+
+    // 6. 关闭 Server 子进程
+    if (serverProcess.connected) {
+      serverProcess.send({ type: "shutdown" })
+    }
+    await gracefulExit(serverProcess)
+  } finally {
+    // 7. 恢复原始终端缓冲区
+    process.stdout.write("\x1b[?1049l")
   }
-  await gracefulExit(serverProcess)
 }
 
 function waitForServerReady(proc: ChildProcess): Promise<string> {
