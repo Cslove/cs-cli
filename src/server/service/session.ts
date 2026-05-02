@@ -17,7 +17,7 @@ export class SessionService {
   async list(projectPath?: string): Promise<SessionEntity[]> {
     const db = getDb()
     if (projectPath) {
-      const stmt = db.prepare("SELECT * FROM session WHERE project_path = ? ORDER BY updated_at DESC")
+      const stmt = db.prepare("SELECT * FROM session WHERE project_id = ? ORDER BY updated_at DESC")
       stmt.bind([projectPath])
       const results: SessionEntity[] = []
       while (stmt.step()) {
@@ -59,15 +59,15 @@ export class SessionService {
       id: uuid(),
       title: title ?? "New Session",
       model: process.env.CS_MODEL ?? "gpt-4o",
-      project_path: process.env.CS_PROJECT ?? "",
+      project_id: process.env.CS_PROJECT ?? "",
       created_at: now,
       updated_at: now,
     }
 
     const db = getDb()
     db.run(
-      "INSERT INTO session (id, title, model, project_path, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-      [session.id, session.title, session.model, session.project_path, session.created_at, session.updated_at],
+      "INSERT INTO session (id, title, model, project_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [session.id, session.title, session.model, session.project_id, session.created_at, session.updated_at],
     )
     scheduleSave()
 

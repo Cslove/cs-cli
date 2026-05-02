@@ -64,7 +64,7 @@ function runMigrations() {
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL DEFAULT '',
       model TEXT NOT NULL DEFAULT '',
-      project_path TEXT NOT NULL DEFAULT '',
+      project_id TEXT NOT NULL DEFAULT '',
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -93,6 +93,44 @@ function runMigrations() {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
+  `)
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS config (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+  `)
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS part (
+      id TEXT PRIMARY KEY,
+      message_id TEXT NOT NULL REFERENCES message(id) ON DELETE CASCADE,
+      type TEXT NOT NULL CHECK(type IN ('text', 'tool_call', 'tool_result')),
+      text TEXT NOT NULL DEFAULT '',
+      tool_name TEXT NOT NULL DEFAULT '',
+      tool_input TEXT NOT NULL DEFAULT '',
+      tool_output TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL
+    );
+  `)
+
+  db.run(`
+    CREATE INDEX IF NOT EXISTS idx_part_message ON part(message_id);
+  `)
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS todo (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL REFERENCES session(id) ON DELETE CASCADE,
+      content TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'in_progress', 'completed')),
+      created_at INTEGER NOT NULL
+    );
+  `)
+
+  db.run(`
+    CREATE INDEX IF NOT EXISTS idx_todo_session ON todo(session_id);
   `)
 
   saveDatabase()

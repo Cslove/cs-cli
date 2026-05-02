@@ -6,6 +6,7 @@ import { ApiProvider } from "./context/api.js"
 import { EventProvider } from "./context/event.js"
 import { SessionProvider } from "./context/session.js"
 import { ProjectProvider } from "./context/project.js"
+import { SyncProvider } from "./context/sync.js"
 import { RouteProvider, useRoute } from "./context/route.js"
 import { KVProvider } from "./context/kv.js"
 import { ToastProvider, Toast } from "./context/toast.js"
@@ -29,12 +30,14 @@ export function App(props: AppProps) {
         <ApiProvider serverUrl={props.serverUrl}>
           <EventProvider>
             <ProjectProvider>
-              <SessionProvider>
-                <RouteProvider initialSessionId={props.sessionId}>
-                  <RawModeGuard />
-                  <AppContent model={props.model} />
-                </RouteProvider>
-              </SessionProvider>
+              <SyncProvider>
+                <SessionProvider>
+                  <RouteProvider initialSessionId={props.sessionId}>
+                    <RawModeGuard />
+                    <AppContent model={props.model} />
+                  </RouteProvider>
+                </SessionProvider>
+              </SyncProvider>
             </ProjectProvider>
           </EventProvider>
         </ApiProvider>

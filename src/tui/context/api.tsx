@@ -1,7 +1,7 @@
 // 对标 opencode 的 context/sdk.tsx —— API Client + SSE Context
 import React, { createContext, useContext } from "react"
 import http from "node:http"
-import type { Session, Message, Project, ProjectCodeFile } from "../../shared/types.js"
+import type { Session, Message, Project, ProjectCodeFile, BootstrapData, SessionSyncData, Config, Todo, Part } from "../../shared/types.js"
 import { useToast } from "./toast.js"
 
 export interface GlobalEvent {
@@ -30,6 +30,12 @@ interface ApiClient {
     get: (id: string) => Promise<Project | null>
     create: (name: string, code?: ProjectCodeFile[]) => Promise<Project | null>
     update: (id: string, input: { name?: string; code?: ProjectCodeFile[] }) => Promise<Project | null>
+  }
+  sync: {
+    bootstrap: () => Promise<BootstrapData | null>
+    sessionSync: (sessionId: string) => Promise<SessionSyncData | null>
+    updateConfig: (key: string, value: string | number | boolean) => Promise<{ success: boolean } | null>
+    updateTodos: (sessionId: string, todos: Array<{ content: string; status: "pending" | "in_progress" | "completed" }>) => Promise<Todo[] | null>
   }
   global: {
     health: () => Promise<{ healthy: boolean; version: string } | null>
@@ -180,6 +186,20 @@ function createApiClient(baseUrl: string, onError: (msg: string) => void): ApiCl
         request<Project>(`/api/project/update/${id}`, {
           method: "PUT",
           body: JSON.stringify(input),
+        }),
+    },
+    sync: {
+      bootstrap: () => request<BootstrapData>("/api/sync/bootstrap"),
+      sessionSync: (sessionId) => request<SessionSyncData>(`/api/sync/session/${sessionId}`),
+      updateConfig: (key, value) =>
+        request<{ success: boolean }>('/api/sync/config', {
+          method: "PUT",
+          body: JSON.stringify({ key, value }),
+        }),
+      updateTodos: (sessionId, todos) =>
+        request<Todo[]>(`/api/sync/todo/${sessionId}`, {
+          method: "PUT",
+          body: JSON.stringify({ todos }),
         }),
     },
     global: {

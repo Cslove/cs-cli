@@ -3,7 +3,7 @@ export interface SessionEntity {
   id: string
   title: string
   model: string
-  project_path: string
+  project_id: string
   created_at: number
   updated_at: number
 }
