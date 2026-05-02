@@ -5,6 +5,7 @@ import fs from "node:fs"
 
 let db: SqlJsDatabase
 let dbPath: string
+let saveTimer: NodeJS.Timeout | undefined
 
 // 对标 opencode 的 storage/storage.ts —— 简化版 SQLite 存储（sql.js WASM）
 export async function initDatabase() {
@@ -47,6 +48,16 @@ export function saveDatabase() {
   fs.writeFileSync(dbPath, buffer)
 }
 
+/** 延迟写入：合并短时间内的多次写操作为一次磁盘写入，避免事件循环阻塞 */
+export function scheduleSave() {
+  if (saveTimer) return
+  saveTimer = setTimeout(() => {
+    saveTimer = undefined
+    saveDatabase()
+  }, 500)
+  saveTimer.unref()
+}
+
 function runMigrations() {
   db.run(`
     CREATE TABLE IF NOT EXISTS session (
@@ -72,6 +83,16 @@ function runMigrations() {
 
   db.run(`
     CREATE INDEX IF NOT EXISTS idx_message_session ON message(session_id);
+  `)
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS project (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      code TEXT NOT NULL DEFAULT '[]',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
   `)
 
   saveDatabase()

@@ -1,7 +1,8 @@
 // 对标 opencode 的 context/sdk.tsx —— API Client + SSE Context
 import React, { createContext, useContext } from "react"
 import http from "node:http"
-import type { Session, Message } from "../../shared/types.js"
+import type { Session, Message, Project, ProjectCodeFile } from "../../shared/types.js"
+import { useToast } from "./toast.js"
 
 export interface GlobalEvent {
   directory: string
@@ -13,19 +14,25 @@ export interface GlobalEvent {
 
 interface ApiClient {
   session: {
-    list: (projectPath?: string) => Promise<Session[]>
-    get: (id: string) => Promise<Session>
-    create: () => Promise<Session>
-    remove: (id: string) => Promise<void>
+    list: (projectPath?: string) => Promise<Session[] | null>
+    get: (id: string) => Promise<Session | null>
+    create: () => Promise<Session | null>
+    remove: (id: string) => Promise<void | null>
   }
   chat: {
-    prompt: (sessionId: string, content: string, model?: string) => Promise<{ sessionId: string; streaming: boolean }>
+    prompt: (sessionId: string, content: string, model?: string) => Promise<{ sessionId: string; streaming: boolean } | null>
   }
   message: {
-    list: (sessionId: string) => Promise<Message[]>
+    list: (sessionId: string) => Promise<Message[] | null>
+  }
+  project: {
+    list: () => Promise<Array<Pick<Project, "id" | "name" | "created_at" | "updated_at">> | null>
+    get: (id: string) => Promise<Project | null>
+    create: (name: string, code?: ProjectCodeFile[]) => Promise<Project | null>
+    update: (id: string, input: { name?: string; code?: ProjectCodeFile[] }) => Promise<Project | null>
   }
   global: {
-    health: () => Promise<{ healthy: boolean; version: string }>
+    health: () => Promise<{ healthy: boolean; version: string } | null>
     /** 对标 opencode 的 sdk.global.event() —— SSE 流订阅 */
     event: (signal?: AbortSignal) => AsyncIterable<GlobalEvent>
   }
@@ -36,7 +43,10 @@ interface ApiClient {
 const ApiContext = createContext<ApiClient | null>(null)
 
 export function ApiProvider({ serverUrl, children }: { serverUrl: string; children: React.ReactNode }) {
-  const client = createApiClient(serverUrl)
+  const toast = useToast()
+  const client = createApiClient(serverUrl, (msg) => {
+    toast.show({ variant: "error", message: msg, duration: 5000 })
+  })
 
   return <ApiContext.Provider value={client}>{children}</ApiContext.Provider>
 }
@@ -47,8 +57,8 @@ export function useApi(): ApiClient {
   return ctx
 }
 
-function createApiClient(baseUrl: string): ApiClient {
-  const request = async <T,>(path: string, options?: RequestInit): Promise<T> => {
+function createApiClient(baseUrl: string, onError: (msg: string) => void): ApiClient {
+  const request = async <T,>(path: string, options?: RequestInit): Promise<T | null> => {
     try {
       const res = await fetch(`${baseUrl}${path}`, {
         headers: { "Content-Type": "application/json" },
@@ -58,9 +68,11 @@ function createApiClient(baseUrl: string): ApiClient {
       return res.json() as Promise<T>
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      throw new Error(msg.includes("ECONNREFUSED") || msg.includes("fetch failed")
+      const friendly = msg.includes("ECONNREFUSED") || msg.includes("fetch failed")
         ? `Server unreachable: ${baseUrl}`
-        : msg)
+        : msg
+      onError(friendly)
+      return null
     }
   }
 
@@ -156,8 +168,22 @@ function createApiClient(baseUrl: string): ApiClient {
     message: {
       list: (sessionId) => request<Message[]>(`/api/session/${sessionId}/messages`),
     },
+    project: {
+      list: () => request<Array<Pick<Project, "id" | "name" | "created_at" | "updated_at">>>("/api/project/list"),
+      get: (id) => request<Project>(`/api/project/detail/${id}`),
+      create: (name, code) =>
+        request<Project>("/api/project/create", {
+          method: "POST",
+          body: JSON.stringify({ name, code }),
+        }),
+      update: (id, input) =>
+        request<Project>(`/api/project/update/${id}`, {
+          method: "PUT",
+          body: JSON.stringify(input),
+        }),
+    },
     global: {
-      health: () => request<{ healthy: boolean; version: string }>("/global/health"),
+      health: () => request<{ healthy: boolean; version: string }>('/global/health'),
       event: (signal) => sseStream(signal),
     },
     serverUrl: baseUrl,

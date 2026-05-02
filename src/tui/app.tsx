@@ -4,6 +4,7 @@ import { Box, Text, useInput, useApp, useStdout } from "ink"
 import { ApiProvider } from "./context/api.js"
 import { EventProvider } from "./context/event.js"
 import { SessionProvider } from "./context/session.js"
+import { ProjectProvider } from "./context/project.js"
 import { RouteProvider, useRoute } from "./context/route.js"
 import { KVProvider } from "./context/kv.js"
 import { ToastProvider, Toast } from "./context/toast.js"
@@ -19,21 +20,25 @@ interface AppProps {
 
 export function App(props: AppProps) {
   // 对标 opencode 的 Provider 嵌套顺序：SDKProvider → KVProvider → ToastProvider → ...
+  // KVProvider/ToastProvider 无 API 依赖，放在 ApiProvider 前，
+  // 这样 ApiProvider 可用 useToast 做错误提示
   return (
-    <ApiProvider serverUrl={props.serverUrl}>
-      <EventProvider>
-        <KVProvider>
-          <ToastProvider>
-            <SessionProvider>
-              <RouteProvider initialSessionId={props.sessionId}>
-                <RawModeGuard />
-                <AppContent model={props.model} />
-              </RouteProvider>
-            </SessionProvider>
-          </ToastProvider>
-        </KVProvider>
-      </EventProvider>
-    </ApiProvider>
+    <KVProvider>
+      <ToastProvider>
+        <ApiProvider serverUrl={props.serverUrl}>
+          <EventProvider>
+            <ProjectProvider>
+              <SessionProvider>
+                <RouteProvider initialSessionId={props.sessionId}>
+                  <RawModeGuard />
+                  <AppContent model={props.model} />
+                </RouteProvider>
+              </SessionProvider>
+            </ProjectProvider>
+          </EventProvider>
+        </ApiProvider>
+      </ToastProvider>
+    </KVProvider>
   )
 }
 

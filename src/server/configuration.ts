@@ -13,7 +13,22 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 })
 export class ContainerConfiguration {
   async onReady() {
-    const { initDatabase } = await import("../storage/database.js")
+    const { initDatabase, getDb, scheduleSave } = await import("../storage/database.js")
     await initDatabase()
+    // 确保至少有一个默认项目，避免 list 请求中创建导致 500 + 事件循环阻塞
+    const db = getDb()
+    const stmt = db.prepare("SELECT id FROM project LIMIT 1")
+    const hasProject = stmt.step()
+    stmt.free()
+    if (!hasProject) {
+      const { v4: uuid } = await import("uuid")
+      const now = Date.now()
+      const id = uuid()
+      db.run(
+        "INSERT INTO project (id, name, code, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+        [id, "default", "[]", now, now],
+      )
+      scheduleSave()
+    }
   }
 }

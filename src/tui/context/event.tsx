@@ -27,6 +27,39 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
     let stopped = false
     let heartbeatTimer: NodeJS.Timeout | undefined
 
+    let queue: GlobalEvent[] = []
+    let timer: NodeJS.Timeout | undefined
+    let last = 0
+
+    const flush = () => {
+      if (queue.length === 0) return
+      const events = queue
+      queue = []
+      timer = undefined
+      last = Date.now()
+      for (const event of events) {
+        const { type, properties } = event.payload
+        const handlers = listeners.current.get(type)
+        if (handlers) {
+          for (const handler of handlers) {
+            handler(properties)
+          }
+        }
+      }
+    }
+
+    const handleEvent = (event: GlobalEvent) => {
+      queue.push(event)
+      const elapsed = Date.now() - last
+
+      if (timer) return
+      if (elapsed < 16) {
+        timer = setTimeout(flush, 16)
+        return
+      }
+      flush()
+    }
+
     // 收到 server.connected 或 server.heartbeat 时标记连接正常
     function markConnected() {
       setConnected(true)
@@ -48,7 +81,7 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
             if (event.payload.type === "server.connected" || event.payload.type === "server.heartbeat") {
               markConnected()
             }
-            dispatchEvent(event)
+            handleEvent(event)
           }
         } catch {
           if (stopped) break
@@ -57,6 +90,10 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
         // SSE 流断开，标记断连
         setConnected(false)
         if (heartbeatTimer) clearTimeout(heartbeatTimer)
+
+        // 重连前先把积压事件刷完
+        if (timer) clearTimeout(timer)
+        if (queue.length > 0) flush()
 
         attempt += 1
         const backoff = Math.min(retryDelay * 2 ** (attempt - 1), maxRetryDelay)
@@ -70,19 +107,10 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
       stopped = true
       abort.abort()
       if (heartbeatTimer) clearTimeout(heartbeatTimer)
+      if (timer) clearTimeout(timer)
+      if (queue.length > 0) flush()
     }
   }, [api])
-
-  // 分发事件到对应 handler
-  function dispatchEvent(event: GlobalEvent) {
-    const { type, properties } = event.payload
-    const handlers = listeners.current.get(type)
-    if (handlers) {
-      for (const handler of handlers) {
-        handler(properties)
-      }
-    }
-  }
 
   const on = useCallback((event: string, handler: EventHandler) => {
     if (!listeners.current.has(event)) {

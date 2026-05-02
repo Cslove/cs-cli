@@ -1,7 +1,7 @@
 // 对标 opencode 的 session/session.ts —— 会话服务
 import { Provide, Scope, ScopeEnum, Init } from "@midwayjs/core"
 import { v4 as uuid } from "uuid"
-import { getDb, saveDatabase } from "../../storage/database.js"
+import { getDb, scheduleSave } from "../../storage/database.js"
 import type { SessionEntity } from "../entity/session.js"
 import type { MessageEntity } from "../entity/message.js"
 
@@ -69,7 +69,7 @@ export class SessionService {
       "INSERT INTO session (id, title, model, project_path, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
       [session.id, session.title, session.model, session.project_path, session.created_at, session.updated_at],
     )
-    saveDatabase()
+    scheduleSave()
 
     return session
   }
@@ -77,13 +77,13 @@ export class SessionService {
   async updateTitle(id: string, title: string): Promise<void> {
     const db = getDb()
     db.run("UPDATE session SET title = ?, updated_at = ? WHERE id = ?", [title, Date.now(), id])
-    saveDatabase()
+    scheduleSave()
   }
 
   async remove(id: string): Promise<void> {
     const db = getDb()
     db.run("DELETE FROM session WHERE id = ?", [id])
-    saveDatabase()
+    scheduleSave()
   }
 
   async addMessage(input: {
@@ -109,7 +109,7 @@ export class SessionService {
 
     // 更新 session 的 updated_at
     db.run("UPDATE session SET updated_at = ? WHERE id = ?", [Date.now(), input.sessionId])
-    saveDatabase()
+    scheduleSave()
 
     return msg
   }

@@ -26,3 +26,16 @@ export interface ChatPromptResponse {
   sessionId: string
   streaming: boolean
 }
+
+export interface ProjectCodeFile {
+  path: string
+  code: string
+}
+
+export interface Project {
+  id: string
+  name: string
+  code: ProjectCodeFile[]
+  created_at: number
+  updated_at: number
+}

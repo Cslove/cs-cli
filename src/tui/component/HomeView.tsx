@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react"
 import { Box, Text, useInput } from "ink"
 import { useSession } from "../context/session.js"
+import { useProject } from "../context/project.js"
 import { useRoute } from "../context/route.js"
 import { useToast } from "../context/toast.js"
 import { useEvent } from "../context/event.js"
@@ -8,6 +9,7 @@ import { useApi } from "../context/api.js"
 
 export function HomeView() {
   const { state, createSession } = useSession()
+  const { state: projectState } = useProject()
   const { navigate } = useRoute()
   const toast = useToast()
   const { connected, on } = useEvent()
@@ -53,7 +55,23 @@ export function HomeView() {
           CS CLI
         </Text>
       </Box>
-      <Text dimColor>A simple CLI agent</Text>
+      {projectState.current
+        ? <Text dimColor>Project: {projectState.current.name} ({projectState.current.id.slice(0, 8)})</Text>
+        : <Text dimColor>No active project</Text>
+      }
+      {projectState.list.length > 0 && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold>Projects:</Text>
+          {projectState.list.map((p) => (
+            <Box key={p.id} flexDirection="row" gap={1}>
+              <Text color={projectState.current?.id === p.id ? "cyan" : "gray"}>
+                {projectState.current?.id === p.id ? "▸" : " "} {p.name}
+              </Text>
+              <Text dimColor>{p.id.slice(0, 8)}</Text>
+            </Box>
+          ))}
+        </Box>
+      )}
       <Box marginTop={1}>
         <Text color="cyan">Press Enter to start a new session</Text>
       </Box>

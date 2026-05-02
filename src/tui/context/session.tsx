@@ -79,6 +79,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   const createSession = useCallback(async () => {
     const session = await api.session.create()
+    if (!session) throw new Error("Failed to create session")
     dispatch({ type: "SET_CURRENT", session })
     return session
   }, [api])
@@ -101,7 +102,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: "ADD_MESSAGE", message: optimisticMsg })
 
       try {
-        await api.chat.prompt(state.current.id, content)
+        const result = await api.chat.prompt(state.current.id, content)
+        if (!result) dispatch({ type: "SET_LOADING", loading: false })
         // streaming 完成后由事件触发 ADD_MESSAGE 和 SET_LOADING
       } catch (e) {
         dispatch({ type: "SET_LOADING", loading: false })
@@ -114,16 +116,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const loadSession = useCallback(
     async (id: string) => {
       const session = await api.session.get(id)
-      dispatch({ type: "SET_CURRENT", session })
+      if (session) dispatch({ type: "SET_CURRENT", session })
       const messages = await api.message.list(id)
-      dispatch({ type: "SET_MESSAGES", messages })
+      if (messages) dispatch({ type: "SET_MESSAGES", messages })
     },
     [api],
   )
 
   const loadSessionList = useCallback(async () => {
     const list = await api.session.list()
-    dispatch({ type: "SET_LIST", list })
+    if (list) dispatch({ type: "SET_LIST", list })
   }, [api])
 
   return (
