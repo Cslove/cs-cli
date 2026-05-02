@@ -25,8 +25,6 @@ export async function start(options: StartOptions) {
   //    \x1b[H    = 光标归位
   process.stdout.write("\x1b[?1049h\x1b[2J\x1b[3J\x1b[H")
 
-  // 兜底：process.exit() 会跳过 finally 块，但 process.on("exit") 回调仍会执行
-  // 用 fs.writeSync 保证同步写入，确保终端恢复
   let restored = false
   const restoreTerminal = () => {
     if (restored) return
@@ -35,11 +33,11 @@ export async function start(options: StartOptions) {
   }
   process.on("exit", restoreTerminal)
 
+  let serverProcess: ChildProcess | undefined
   try {
     // 1. 拉起 Midway Server 子进程
-    // tsx 环境下执行 .ts，node 编译后执行 .js，通过 process.argv 判断
     const ext = process.argv[1]?.endsWith(".ts") ? ".ts" : ".js"
-    const serverProcess = fork(join(__dirname, "..", "server", `bootstrap${ext}`), [], {
+    serverProcess = fork(join(__dirname, "..", "server", `bootstrap${ext}`), [], {
       env: {
         ...process.env,
         CS_PROJECT: options.project,
@@ -49,32 +47,15 @@ export async function start(options: StartOptions) {
       stdio: ["pipe", "pipe", "pipe", "ipc"],
     })
 
-    // 缓冲子进程日志（不直接转发，避免冲掉 Ink TUI 渲染）
-    // 仅在子进程异常退出时输出缓冲内容用于调试
     let logBuf = ""
     serverProcess.stdout?.on("data", (data: Buffer) => { logBuf += data.toString() })
     serverProcess.stderr?.on("data", (data: Buffer) => { logBuf += data.toString() })
 
-    serverProcess.on("exit", (code) => {
-      if (code !== 0 && code !== null && logBuf) {
-        process.stderr.write(`\n[server] exited with code ${code}:\n${logBuf}\n`)
-      }
-    })
-
     // 2. 等待 Server 就绪
-    const serverUrl = await waitForServerReady(serverProcess)
-
-    // 服务器启动后，子进程退出不再影响 TUI
-    // SSE 断连会通过 EventProvider 的 connected 状态反映到 HomeView
+    const serverUrl = await waitForServerReady(serverProcess, () => logBuf)
     serverProcess.removeAllListeners("exit")
-    serverProcess.on("exit", (code) => {
-      if (code !== 0 && code !== null && logBuf) {
-        process.stderr.write(`\n[server] exited with code ${code}:\n${logBuf}\n`)
-      }
-    })
 
-    // 3. 渲染 Ink TUI（事件通过 SSE /global/event 订阅，不再需要 IPC）
-    //    exitOnCtrlC: false — 禁止 Ink 直接 process.exit()，确保 finally 块执行
+    // 3. 渲染 Ink TUI
     const instance = render(
       <App
         serverUrl={serverUrl}
@@ -85,7 +66,6 @@ export async function start(options: StartOptions) {
       { exitOnCtrlC: false },
     )
 
-    // 4. Ctrl+C 手动退出：先 unmount Ink，再走正常退出流程
     const onSigInt = () => {
       process.off("SIGINT", onSigInt)
       instance.unmount()
@@ -96,19 +76,26 @@ export async function start(options: StartOptions) {
     await instance.waitUntilExit()
 
     // 6. 关闭 Server 子进程
-    if (serverProcess.connected) {
+    if (serverProcess?.connected) {
       serverProcess.send({ type: "shutdown" })
     }
-    await gracefulExit(serverProcess)
+    await gracefulExit(serverProcess!)
   } finally {
-    // 7. 切回主屏幕缓冲区（原始终端内容自动恢复）
+    // 7. 确保子进程被杀掉（防止端口残留）
+    if (serverProcess && serverProcess.exitCode === null) {
+      serverProcess.kill("SIGKILL")
+    }
+    // 8. 切回主屏幕缓冲区（原始终端内容自动恢复）
     restoreTerminal()
   }
 }
 
-function waitForServerReady(proc: ChildProcess): Promise<string> {
+function waitForServerReady(proc: ChildProcess, getLog: () => string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("Server startup timeout (10s)")), 10_000)
+    const timeout = setTimeout(() => {
+      const log = getLog()
+      reject(new Error(`Server startup timeout (10s)${log ? `\n${log}` : ""}`))
+    }, 10_000)
 
     proc.on("message", (msg: any) => {
       if (msg.type === "server:ready") {
@@ -125,7 +112,8 @@ function waitForServerReady(proc: ChildProcess): Promise<string> {
     proc.on("exit", (code) => {
       if (code !== 0 && code !== null) {
         clearTimeout(timeout)
-        reject(new Error(`Server process exited with code ${code}`))
+        const log = getLog()
+        reject(new Error(`Server process exited with code ${code}${log ? `\n${log}` : ""}`))
       }
     })
   })

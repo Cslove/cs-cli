@@ -1,24 +1,56 @@
 // 对标 opencode 的 cli/cmd/tui/worker.ts —— 子进程入口
 import { initializeGlobalApplicationContext, MidwayApplicationManager } from "@midwayjs/core"
-import { dirname } from "node:path"
+import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-// 显式导入 Configuration 模块，确保 tsx 环境下装饰器元数据被正确解析
-import "./configuration.js"
+import { readdir } from "node:fs/promises"
+import { createConnection } from "node:net"
+import { ContainerConfiguration } from "./configuration.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
+function isPortAvailable(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = createConnection({ host: "127.0.0.1", port })
+    socket.on("connect", () => {
+      socket.destroy()
+      resolve(false)
+    })
+    socket.on("error", () => resolve(true))
+  })
+}
+
+async function loadModules() {
+  const ext = import.meta.url.endsWith(".ts") ? ".ts" : ".js"
+  const modules: any[] = []
+  for (const dir of ["controller", "service", "entity"]) {
+    const absDir = join(__dirname, dir)
+    let files: string[]
+    try { files = await readdir(absDir) } catch { continue }
+    for (const file of files) {
+      if (file.endsWith(ext)) {
+        modules.push(await import(join(absDir, file)))
+      }
+    }
+  }
+  return modules
+}
+
 async function main() {
+  const requestedPort = parseInt(process.env.CS_PORT ?? "0", 10)
+  if (requestedPort > 0 && !(await isPortAvailable(requestedPort))) {
+    console.warn(`Port ${requestedPort} is in use, falling back to random port`)
+    process.env.CS_PORT = "0"
+  }
+  const modules = await loadModules()
   const container = await initializeGlobalApplicationContext({
-    baseDir: __dirname,
+    imports: [ContainerConfiguration],
+    preloadModules: modules,
   })
 
-  // 通过 MidwayApplicationManager 获取 Koa Framework，再取实际监听端口
   let port = 0
   try {
     const appManager = await container.getAsync(MidwayApplicationManager)
     const framework = appManager.getFramework("koa") as any
-    // framework 已注册但 Server 可能还没开始监听
-    // 用轮询等待端口绑定完成（Midway 的 koa.listen 是异步的）
     for (let i = 0; i < 50; i++) {
       const addr = framework?.getServer?.()?.address?.()
       if (typeof addr === "object" && addr?.port) {
@@ -28,11 +60,9 @@ async function main() {
       await new Promise(r => setTimeout(r, 100))
     }
   } catch {
-    // fallback: 尝试从环境变量读取
     port = parseInt(process.env.CS_PORT ?? "0", 10)
   }
 
-  // 通知主进程 Server 已就绪
   if (process.send) {
     process.send({
       type: "server:ready",
@@ -40,7 +70,6 @@ async function main() {
     })
   }
 
-  // 监听主进程的 shutdown 信号
   process.on("message", (msg: any) => {
     if (msg.type === "shutdown") {
       process.exit(0)
