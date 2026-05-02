@@ -76,11 +76,8 @@ export function HomeView() {
         <Text color="cyan">Press Enter to start a new session</Text>
       </Box>
       {greetings.length > 0 && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Greetings:</Text>
-          {greetings.map((g, i) => (
-            <Text key={i} color="yellow">  {g}</Text>
-          ))}
+        <Box marginTop={1}>
+          <Text dimColor>{greetings[greetings.length - 1]}</Text>
         </Box>
       )}
       {state.list.length > 0 && (

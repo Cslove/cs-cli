@@ -1,6 +1,7 @@
 // 对标 opencode 的 cli/cmd/tui/app.tsx —— TUI 根组件
 import React from "react"
-import { Box, Text, useInput, useApp, useStdout } from "ink"
+import { Box, Text, useInput, useApp } from "ink"
+import { useTerminalSize } from "./hook/useTerminalSize.js"
 import { ApiProvider } from "./context/api.js"
 import { EventProvider } from "./context/event.js"
 import { SessionProvider } from "./context/session.js"
@@ -60,15 +61,15 @@ function RawModeGuard() {
 
 function AppContent({ model }: { model?: string }) {
   const { route } = useRoute()
-  const { stdout } = useStdout()
+  const { columns, rows } = useTerminalSize()
 
   return (
     // 对标 opencode 的根 <box>：撑满终端 + 背景色填充
     // 不这样做的话，内容只占自身高度，终端剩余空间会露出底层 shell 内容
     <Box
       flexDirection="column"
-      width={stdout.columns}
-      height={stdout.rows}
+      width={columns}
+      height={rows}
     >
       {/* Toast 在顶部右侧，对标 opencode 的 position=absolute top=2 right=2 */}
       <Toast />

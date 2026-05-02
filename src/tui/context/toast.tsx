@@ -1,7 +1,8 @@
 // 对标 opencode 的 ui/toast.tsx —— 单例通知 + 自动超时
 import React, { createContext, useContext, useState, useCallback, useRef } from "react"
-import { Box, Text, useStdout } from "ink"
+import { Box, Text } from "ink"
 import type { BoxStyle } from "cli-boxes"
+import { useTerminalSize } from "../hook/useTerminalSize.js"
 
 // 对标 opencode 的 SplitBorder.customBorderChars
 // 只显示左右竖线 ┃，其他边为空
@@ -84,7 +85,7 @@ export function useToast() {
  */
 export function Toast() {
   const { currentToast } = useToast()
-  const { stdout } = useStdout()
+  const { columns } = useTerminalSize()
   if (!currentToast) return null
 
   const color = VARIANT_COLORS[currentToast.variant ?? "info"]
@@ -96,7 +97,7 @@ export function Toast() {
       alignItems="flex-start"
       top={2}
       right={2}
-      maxWidth={Math.min(60, stdout.columns - 6)}
+      maxWidth={Math.min(60, columns - 6)}
       flexDirection="column"
       borderStyle={SPLIT_BORDER}
       borderLeft
