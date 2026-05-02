@@ -8,6 +8,7 @@ import { CommandService } from "../service/command.js"
 import { SessionService } from "../service/session.js"
 import { TodoService } from "../service/todo.js"
 import { PartService } from "../service/part.js"
+import { EventService } from "../service/event.js"
 import type { BootstrapData, SessionSyncData, Config } from "../../shared/types.js"
 
 @Controller("/api/sync")
@@ -32,6 +33,9 @@ export class SyncController {
 
   @Inject()
   partService!: PartService
+
+  @Inject()
+  eventService!: EventService
 
   /**
    * 对标 opencode SyncProvider.bootstrap()
@@ -105,6 +109,7 @@ export class SyncController {
     @Body() body: { todos: Array<{ content: string; status: "pending" | "in_progress" | "completed" }> },
   ) {
     const todos = await this.todoService.replaceAll(sessionId, body.todos)
+    this.eventService.emit("todo.updated", { sessionID: sessionId, todos })
     return todos
   }
 }

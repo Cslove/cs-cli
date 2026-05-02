@@ -1,9 +1,10 @@
 // 对标 opencode 的 server/server.ts 中的 Midway 配置
-import { Configuration } from "@midwayjs/core"
+import { Configuration, Inject } from "@midwayjs/core"
 import * as koa from "@midwayjs/koa"
 import * as validate from "@midwayjs/validate"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
+import { EventService } from "./service/event.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -12,6 +13,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
   importConfigs: [join(__dirname, "config")],
 })
 export class ContainerConfiguration {
+  @Inject()
+  eventService!: EventService
+
   async onReady() {
     const { initDatabase, getDb, scheduleSave } = await import("../storage/database.js")
     await initDatabase()
@@ -30,5 +34,10 @@ export class ContainerConfiguration {
       )
       scheduleSave()
     }
+  }
+
+  async onStop() {
+    // 对标 opencode 的 server.instance.disposed —— 通知 TUI 重新 bootstrap
+    this.eventService.emit("server.instance.disposed", {})
   }
 }
