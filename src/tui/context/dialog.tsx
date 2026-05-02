@@ -160,8 +160,6 @@ function DialogOverlay({ children, size }: { children: React.ReactNode; size: Di
       <Box
         flexDirection="column"
         width={width}
-        borderStyle="round"
-        borderColor="gray"
         backgroundColor="black"
         paddingX={2}
         paddingY={1}
