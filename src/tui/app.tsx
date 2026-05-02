@@ -7,6 +7,10 @@ import { EventProvider } from "./context/event.js"
 import { SessionProvider } from "./context/session.js"
 import { ProjectProvider } from "./context/project.js"
 import { SyncProvider } from "./context/sync.js"
+import { LocalProvider } from "./context/local.js"
+import { KeybindProvider } from "./context/keybind.js"
+import { DialogProvider } from "./context/dialog.js"
+import { CommandProvider } from "./context/command.js"
 import { RouteProvider, useRoute } from "./context/route.js"
 import { KVProvider } from "./context/kv.js"
 import { ToastProvider, Toast } from "./context/toast.js"
@@ -31,12 +35,20 @@ export function App(props: AppProps) {
           <EventProvider>
             <ProjectProvider>
               <SyncProvider>
-                <SessionProvider>
-                  <RouteProvider initialSessionId={props.sessionId}>
-                    <RawModeGuard />
-                    <AppContent model={props.model} />
-                  </RouteProvider>
-                </SessionProvider>
+                <LocalProvider>
+                  <KeybindProvider>
+                    <DialogProvider>
+                      <CommandProvider>
+                        <SessionProvider>
+                          <RouteProvider initialSessionId={props.sessionId}>
+                            <RawModeGuard />
+                            <AppContent model={props.model} />
+                          </RouteProvider>
+                        </SessionProvider>
+                      </CommandProvider>
+                    </DialogProvider>
+                  </KeybindProvider>
+                </LocalProvider>
               </SyncProvider>
             </ProjectProvider>
           </EventProvider>
