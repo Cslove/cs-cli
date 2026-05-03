@@ -196,17 +196,17 @@ function AppContent({ model }: { model?: string }) {
       height={rows}
     >
       <Toast />
-      <Box flexDirection="column" flexGrow={1} padding={1}>
-        {route.type === "home" ? (
-          <HomeView />
-        ) : route.type === "session" ? (
+      {route.type === "home" ? (
+        <HomeView />
+      ) : route.type === "session" ? (
+        <Box flexDirection="column" flexGrow={1} padding={1}>
           <ChatView model={model} />
-        ) : (
-          <Box>
-            <Text color="red">Unknown route</Text>
-          </Box>
-        )}
-      </Box>
+        </Box>
+      ) : (
+        <Box>
+          <Text color="red">Unknown route</Text>
+        </Box>
+      )}
     </Box>
   )
 }
