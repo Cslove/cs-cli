@@ -11,6 +11,9 @@ import { LocalProvider } from "./context/local.js"
 import { KeybindProvider } from "./context/keybind.js"
 import { DialogProvider } from "./context/dialog.js"
 import { CommandProvider } from "./context/command.js"
+import { FrecencyProvider } from "./context/frecency.js"
+import { PromptHistoryProvider } from "./context/prompt-history.js"
+import { PromptRefProvider } from "./context/prompt-ref.js"
 import { RouteProvider, useRoute } from "./context/route.js"
 import { KVProvider } from "./context/kv.js"
 import { ToastProvider, Toast } from "./context/toast.js"
@@ -37,12 +40,18 @@ export function App(props: AppProps) {
                   <KeybindProvider>
                     <DialogProvider>
                       <CommandProvider>
-                        <SessionProvider>
-                          <RouteProvider initialSessionId={props.sessionId}>
-                            <RawModeGuard />
-                            <AppContent model={props.model} />
-                          </RouteProvider>
-                        </SessionProvider>
+                        <FrecencyProvider>
+                          <PromptHistoryProvider>
+                            <PromptRefProvider>
+                              <SessionProvider>
+                                <RouteProvider initialSessionId={props.sessionId}>
+                                  <RawModeGuard />
+                                  <AppContent model={props.model} />
+                                </RouteProvider>
+                              </SessionProvider>
+                            </PromptRefProvider>
+                          </PromptHistoryProvider>
+                        </FrecencyProvider>
                       </CommandProvider>
                     </DialogProvider>
                   </KeybindProvider>
