@@ -26,8 +26,6 @@ interface AppProps {
 
 export function App(props: AppProps) {
   // 对标 opencode 的 Provider 嵌套顺序：SDKProvider → KVProvider → ToastProvider → ...
-  // KVProvider/ToastProvider 无 API 依赖，放在 ApiProvider 前，
-  // 这样 ApiProvider 可用 useToast 做错误提示
   return (
     <KVProvider>
       <ToastProvider>
@@ -79,14 +77,11 @@ function AppContent({ model }: { model?: string }) {
   const { columns, rows } = useTerminalSize()
 
   return (
-    // 对标 opencode 的根 <box>：撑满终端 + 背景色填充
-    // 不这样做的话，内容只占自身高度，终端剩余空间会露出底层 shell 内容
     <Box
       flexDirection="column"
       width={columns}
       height={rows}
     >
-      {/* Toast 在顶部右侧，对标 opencode 的 position=absolute top=2 right=2 */}
       <Toast />
       <Box flexDirection="column" flexGrow={1} padding={1}>
         {route.type === "home" ? (

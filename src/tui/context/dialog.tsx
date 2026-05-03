@@ -193,11 +193,11 @@ export function DialogItem({
   keybind?: string
   onSelect?: () => void
 }) {
-  return (
-    <Box flexDirection="row" gap={1}>
-      <Text color={selected ? "cyan" : undefined}>{selected ? "▸" : " "} </Text>
-      <Text bold={selected}>{label}</Text>
-      {description && <Text dimColor> {description}</Text>}
+   return (
+    <Box flexDirection="row" gap={1} backgroundColor={selected ? "gray" : undefined} paddingX={1}>
+      <Text color={selected ? "cyan" : "gray"}>{selected ? "▸" : " "} </Text>
+      <Text bold={selected} color={selected ? "white" : undefined}>{label}</Text>
+      {description && <Text dimColor={!selected} color={selected ? "gray" : undefined}> {description}</Text>}
       {keybind && <Text dimColor color="gray"> [{keybind}]</Text>}
     </Box>
   )

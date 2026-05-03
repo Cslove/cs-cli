@@ -156,9 +156,9 @@ export function CommandProvider({ children }: { children: React.ReactNode }) {
   return <CommandCtx.Provider value={value}>{children}</CommandCtx.Provider>
 }
 
-export function useCommandDialog() {
+export function useCommand() {
   const ctx = useContext(CommandCtx)
-  if (!ctx) throw new Error("useCommandDialog must be used within CommandProvider")
+  if (!ctx) throw new Error("useCommand must be used within CommandProvider")
   return ctx
 }
 

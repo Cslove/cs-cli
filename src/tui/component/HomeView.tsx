@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react"
-import { Box, Text, useInput } from "ink"
+import { Box, Text } from "ink"
 import { useSession } from "../context/session.js"
 import { useProject } from "../context/project.js"
 import { useRoute } from "../context/route.js"
 import { useToast } from "../context/toast.js"
 import { useEvent } from "../context/event.js"
 import { useApi } from "../context/api.js"
-import { useCommandDialog } from "../context/command.js"
+import { useCommand } from "../context/command.js"
 import { useDialog, DialogTitle, DialogFooter } from "../context/dialog.js"
 
 export function HomeView() {
@@ -23,18 +23,7 @@ export function HomeView() {
     setGreetings((prev) => [...prev.slice(-9), msg])
   }), [on])
 
-  useInput((ch, key) => {
-    if (ch === "n") {
-      toast.show({
-        title: "通知！",
-        message: "CS CLI is ready!",
-        variant: "info",
-        duration: 3000,
-      })
-    }
-  })
-
-  const command = useCommandDialog()
+  const command = useCommand()
   const dialog = useDialog()
 
   const handleNewSession = async () => {
