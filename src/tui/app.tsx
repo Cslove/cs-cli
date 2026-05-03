@@ -1,22 +1,22 @@
 // 对标 opencode 的 cli/cmd/tui/app.tsx —— TUI 根组件
-import React from "react"
+import React, { useEffect } from "react"
 import { Box, Text, useInput, useApp } from "ink"
 import { useTerminalSize } from "./hook/useTerminalSize.js"
 import { ApiProvider } from "./context/api.js"
-import { EventProvider } from "./context/event.js"
+import { EventProvider, useEvent } from "./context/event.js"
 import { SessionProvider } from "./context/session.js"
 import { ProjectProvider } from "./context/project.js"
-import { SyncProvider } from "./context/sync.js"
-import { LocalProvider } from "./context/local.js"
+import { SyncProvider, useSync } from "./context/sync.js"
+import { LocalProvider, useLocal } from "./context/local.js"
 import { KeybindProvider } from "./context/keybind.js"
-import { DialogProvider } from "./context/dialog.js"
-import { CommandProvider } from "./context/command.js"
+import { DialogProvider, useDialog } from "./context/dialog.js"
+import { CommandProvider, useCommand } from "./context/command.js"
 import { FrecencyProvider } from "./context/frecency.js"
 import { PromptHistoryProvider } from "./context/prompt-history.js"
 import { PromptRefProvider } from "./context/prompt-ref.js"
 import { RouteProvider, useRoute } from "./context/route.js"
-import { KVProvider } from "./context/kv.js"
-import { ToastProvider, Toast } from "./context/toast.js"
+import { KVProvider, useKV } from "./context/kv.js"
+import { ToastProvider, useToast, Toast } from "./context/toast.js"
 import { ChatView } from "./component/ChatView.js"
 import { HomeView } from "./component/HomeView.js"
 
@@ -28,7 +28,6 @@ interface AppProps {
 }
 
 export function App(props: AppProps) {
-  // 对标 opencode 的 Provider 嵌套顺序：SDKProvider → KVProvider → ToastProvider → ...
   return (
     <KVProvider>
       <ToastProvider>
@@ -65,12 +64,6 @@ export function App(props: AppProps) {
   )
 }
 
-/**
- * 在根组件注册 useInput，确保 raw mode 全程开启。
- * Ink 的 useInput 是按组件启用/关闭的，
- * 如果只有 ChatView 注册了 useInput，在 HomeView 时 raw mode 就关了，
- * 按键会被直接回显为乱码。
- */
 function RawModeGuard() {
   const { exit } = useApp()
   useInput((ch, key) => {
@@ -81,9 +74,120 @@ function RawModeGuard() {
   return null
 }
 
+function setTerminalTitle(title: string) {
+  process.stdout.write(`\x1b]0;${title}\x07`)
+}
+
 function AppContent({ model }: { model?: string }) {
-  const { route } = useRoute()
+  const { route, navigate } = useRoute()
   const { columns, rows } = useTerminalSize()
+  const command = useCommand()
+  const dialog = useDialog()
+  const local = useLocal()
+  const sync = useSync()
+  const kv = useKV()
+  const toast = useToast()
+  const event = useEvent()
+  const { exit } = useApp()
+
+  const sessionId = route.type === "session" ? route.sessionId : undefined
+
+  useEffect(() => {
+    const unregister = command.register([
+      {
+        title: "New session",
+        value: "session.new",
+        keybind: "session_new",
+        category: "Session",
+        onSelect: () => {
+          navigate({ type: "home" })
+          dialog.clear()
+        },
+      },
+      {
+        title: "Switch model",
+        value: "model.cycle_recent",
+        keybind: "model_cycle",
+        category: "Model",
+        onSelect: () => {
+          local.model.cycle(1)
+        },
+      },
+      {
+        title: "Switch agent",
+        value: "agent.cycle",
+        keybind: "agent_next",
+        category: "Agent",
+        onSelect: () => {
+          local.agent.move(1)
+        },
+      },
+      {
+        title: "Suspend terminal",
+        value: "terminal.suspend",
+        keybind: "session_list",
+        category: "System",
+        onSelect: () => {
+          process.once("SIGCONT", () => {
+            setTerminalTitle("CS CLI")
+          })
+          process.kill(0, "SIGTSTP")
+        },
+      },
+      {
+        title: "Exit",
+        value: "app.exit",
+        keybind: "app_exit",
+        category: "System",
+        onSelect: () => exit(),
+      },
+    ])
+    return unregister
+  }, [])
+
+  useEffect(() => {
+    const titleEnabled = kv.get("terminal_title_enabled", true)
+    if (!titleEnabled) return
+
+    if (route.type === "home") {
+      setTerminalTitle("CS CLI")
+    } else if (route.type === "session") {
+      const session = sync.data.session.find((s: { id: string }) => s.id === sessionId)
+      const title = session?.title && session.title !== "New Session"
+        ? `CS | ${session.title.length > 40 ? session.title.slice(0, 37) + "..." : session.title}`
+        : "CS CLI"
+      setTerminalTitle(title)
+    }
+  }, [route.type, sessionId, sync.data.session])
+
+  useEffect(() => {
+    const unsubs: Array<() => void> = []
+
+    // session.deleted：如果当前会话被删除，导航回首页
+    unsubs.push(event.on("session.deleted", (data: unknown) => {
+      const info = (data as { info?: { id: string } } | undefined)?.info
+      if (route.type === "session" && info?.id === sessionId) {
+        navigate({ type: "home" })
+        toast.show({ variant: "info", message: "The current session was deleted" })
+      }
+    }))
+
+    // session.error：显示错误提示
+    unsubs.push(event.on("session.error", (data: unknown) => {
+      const error = (data as { error?: unknown } | undefined)?.error
+      const message = error instanceof Error ? error.message : String(error ?? "Unknown error")
+      toast.show({ variant: "error", message, duration: 5000 })
+    }))
+
+    // server.instance.disposed：服务器关闭时提示
+    unsubs.push(event.on("server.instance.disposed", () => {
+      toast.show({ variant: "warning", message: "Server connection lost", duration: 10000 })
+    }))
+
+    return () => {
+      for (const unsub of unsubs) unsub()
+    }
+  }, [route.type, sessionId])
 
   return (
     <Box

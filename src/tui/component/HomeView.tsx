@@ -6,8 +6,6 @@ import { useRoute } from "../context/route.js"
 import { useToast } from "../context/toast.js"
 import { useEvent } from "../context/event.js"
 import { useApi } from "../context/api.js"
-import { useCommand } from "../context/command.js"
-import { useDialog, DialogTitle, DialogFooter } from "../context/dialog.js"
 
 export function HomeView() {
   const { state, createSession } = useSession()
@@ -23,9 +21,6 @@ export function HomeView() {
     setGreetings((prev) => [...prev.slice(-9), msg])
   }), [on])
 
-  const command = useCommand()
-  const dialog = useDialog()
-
   const handleNewSession = async () => {
     try {
       const session = await createSession()
@@ -34,52 +29,6 @@ export function HomeView() {
       toast.error(e)
     }
   }
-
-  // 注册测试命令
-  useEffect(() => {
-    const unregister = command.register([
-      {
-        title: "Show Greeting",
-        value: "test_greeting",
-        description: "Show a greeting dialog",
-        category: "Test",
-        keybind: "session_new",
-        onSelect: () => {
-          dialog.replace(
-            <Box flexDirection="column">
-              <DialogTitle>Hello from CommandProvider!</DialogTitle>
-              <Text>This is a test dialog opened via command panel.</Text>
-              <Text dimColor>You pressed a command that triggered this popup.</Text>
-              <DialogFooter />
-            </Box>,
-          )
-        },
-      },
-      {
-        title: "New Session",
-        value: "new_session",
-        description: "Create a new chat session",
-        category: "Session",
-        suggested: true,
-        onSelect: handleNewSession,
-      },
-      {
-        title: "Show Toast",
-        value: "test_toast",
-        description: "Show a test toast notification",
-        category: "Test",
-        onSelect: () => {
-          toast.show({
-            title: "Toast Test",
-            message: "This is a test notification from CommandProvider!",
-            variant: "info",
-            duration: 3000,
-          })
-        },
-      },
-    ])
-    return unregister
-  }, [])
 
   return (
     <Box flexDirection="column" padding={1}>
