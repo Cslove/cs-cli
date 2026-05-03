@@ -63,7 +63,7 @@ export async function start(options: StartOptions) {
         model={options.model}
         sessionId={options.session}
       />,
-      { exitOnCtrlC: false },
+      { exitOnCtrlC: false, maxFps: 30 },
     )
 
     const onSigInt = () => {
