@@ -196,17 +196,24 @@ function AppContent({ model }: { model?: string }) {
       height={rows}
     >
       <Toast />
-      {route.type === "home" ? (
-        <HomeView />
-      ) : route.type === "session" ? (
-        <Box flexDirection="column" flexGrow={1} padding={1}>
-          <ChatView model={model} />
-        </Box>
-      ) : (
-        <Box>
-          <Text color="red">Unknown route</Text>
-        </Box>
-      )}
+      <Box flexDirection="column" flexGrow={1}>
+        {route.type === "home" ? (
+          <HomeView />
+        ) : route.type === "session" ? (
+          <Box flexDirection="column" flexGrow={1} padding={1}>
+            <ChatView model={model} />
+          </Box>
+        ) : (
+          <Box>
+            <Text color="red">Unknown route</Text>
+          </Box>
+        )}
+      </Box>
+      {/* 固定在终端最底行左下角的连接状态指示器 */}
+      <Box flexDirection="row" gap={1} paddingLeft={2} paddingBottom={1} flexShrink={0}>
+        <Text color={event.connected ? "green" : "red"}>●</Text>
+        <Text dimColor color="gray">{event.connected ? "Connected" : "Disconnected"}</Text>
+      </Box>
     </Box>
   )
 }

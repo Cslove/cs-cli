@@ -261,7 +261,7 @@ export function HomeView() {
 
       {/* 输入框区域 */}
       <Box
-        width={columns - 8}
+        width={Math.floor(columns * 0.7)}
         flexDirection="column"
         flexShrink={0}
       >
@@ -275,6 +275,18 @@ export function HomeView() {
           agentName={agentName}
           modelName={modelName}
         />
+
+        {/* 常用命令提示：输入框正下方，两列布局 */}
+        <Box flexDirection="column" gap={1} paddingTop={1} width="100%">
+          <Box flexDirection="row" justifyContent="space-between">
+            <Text dimColor color="gray">ctrl+n  New session</Text>
+            <Text dimColor color="gray">ctrl+p  Commands</Text>
+          </Box>
+          <Box flexDirection="row" justifyContent="space-between">
+            <Text dimColor color="gray">ctrl+m  Switch model</Text>
+            <Text dimColor color="gray">ctrl+q  Exit</Text>
+          </Box>
+        </Box>
       </Box>
     </Box>
   )
