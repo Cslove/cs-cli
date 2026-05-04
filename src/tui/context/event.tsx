@@ -1,7 +1,21 @@
 // 对标 opencode 的 context/sdk.tsx 中的 SSE 逻辑 —— 事件 Context
 // 从 IPC 订阅改为 HTTP SSE 订阅，对标 opencode 的 sdk.global.event()
+//
+// 性能关键设计：
+// 1. flush 合并窗口 33ms（匹配 Ink 30fps 节流），避免每帧多次 dispatch
+// 2. 使用 React unstable_batchedUpdates 将一批事件的 dispatch 合并为单次 commit
+// 3. connected 状态用 ref 追踪，仅在变化时 setState，避免心跳每次触发重渲染
 import React, { createContext, useContext, useEffect, useRef, useCallback, useState } from "react"
 import { useApi, type GlobalEvent } from "./api.js"
+
+// React 批量更新 API（React 18+ 自动批量化，但手动调用确保在异步回调中也生效）
+let batchedUpdates: <T>(fn: () => T) => T
+try {
+  // @ts-expect-error -- React 内部 API，React 19 中可能不存在但不会报错
+  batchedUpdates = React.unstable_batchedUpdates ?? ((fn) => fn())
+} catch {
+  batchedUpdates = (fn) => fn()
+}
 
 type EventHandler = (data: unknown) => void
 
@@ -18,6 +32,8 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
   const api = useApi()
   const listeners = useRef<Map<string, Set<EventHandler>>>(new Map())
   const [connected, setConnected] = useState(false)
+  // 用 ref 追踪连接状态，避免心跳每次都触发 setConnected → React commit
+  const connectedRef = useRef(false)
 
   useEffect(() => {
     const abort = new AbortController()
@@ -31,21 +47,30 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
     let timer: NodeJS.Timeout | undefined
     let last = 0
 
+    // FLUSH_INTERVAL: 匹配 Ink 的 33ms (30fps) 节流窗口
+    // 确保同一帧内的多个 SSE 事件合并为一次 React commit
+    const FLUSH_INTERVAL = 33
+
     const flush = () => {
       if (queue.length === 0) return
       const events = queue
       queue = []
       timer = undefined
       last = Date.now()
-      for (const event of events) {
-        const { type, properties } = event.payload
-        const handlers = listeners.current.get(type)
-        if (handlers) {
-          for (const handler of handlers) {
-            handler(properties)
+
+      // 使用 batchedUpdates 将一批事件的所有 dispatch 合并为一次 React commit
+      // 这样即使一批有 10 个 PART_DELTA，Ink 也只做一次全量重绘
+      batchedUpdates(() => {
+        for (const event of events) {
+          const { type, properties } = event.payload
+          const handlers = listeners.current.get(type)
+          if (handlers) {
+            for (const handler of handlers) {
+              handler(properties)
+            }
           }
         }
-      }
+      })
     }
 
     const handleEvent = (event: GlobalEvent) => {
@@ -53,8 +78,8 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
       const elapsed = Date.now() - last
 
       if (timer) return
-      if (elapsed < 16) {
-        timer = setTimeout(flush, 16)
+      if (elapsed < FLUSH_INTERVAL) {
+        timer = setTimeout(flush, FLUSH_INTERVAL)
         return
       }
       flush()
@@ -62,11 +87,18 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
 
     // 收到 server.connected 或 server.heartbeat 时标记连接正常
     function markConnected() {
-      setConnected(true)
+      // 仅在状态变化时调用 setState，避免心跳每次触发 React commit
+      if (!connectedRef.current) {
+        connectedRef.current = true
+        setConnected(true)
+      }
       // 15s 内没收到下一个心跳就判定断连（服务端每 10s 发一次）
       if (heartbeatTimer) clearTimeout(heartbeatTimer)
       heartbeatTimer = setTimeout(() => {
-        if (!stopped) setConnected(false)
+        if (!stopped) {
+          connectedRef.current = false
+          setConnected(false)
+        }
       }, 15_000)
     }
 
@@ -88,7 +120,10 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
         }
 
         // SSE 流断开，标记断连
-        setConnected(false)
+        if (connectedRef.current) {
+          connectedRef.current = false
+          setConnected(false)
+        }
         if (heartbeatTimer) clearTimeout(heartbeatTimer)
 
         // 重连前先把积压事件刷完

@@ -1,5 +1,5 @@
 // 对标 opencode 的 context/local.tsx —— 本地 UI 状态（agent/model 选择、持久化）
-import React, { createContext, useContext, useReducer, useCallback, useEffect } from "react"
+import React, { createContext, useContext, useReducer, useCallback, useEffect, useRef } from "react"
 import { useSync } from "./sync.js"
 import { useKV } from "./kv.js"
 import { useToast } from "./toast.js"
@@ -90,6 +90,10 @@ export function LocalProvider({ children }: { children: React.ReactNode }) {
   const kv = useKV()
   const toast = useToast()
 
+  // ---- Ref 存储 sync.data，避免 useCallback 依赖 sync.data.* 导致高频重建 ----
+  const syncDataRef = useRef(sync.data)
+  syncDataRef.current = sync.data
+
   // 加载持久化数据
   useEffect(() => {
     if (!kv.ready) return
@@ -108,52 +112,52 @@ export function LocalProvider({ children }: { children: React.ReactNode }) {
     kv.set(key, value)
   }, [kv])
 
-  // 验证 model 是否在可用 provider 列表中
+  // 验证 model 是否在可用 provider 列表中（通过 ref 读最新数据，不触发 useCallback 重建）
   const isModelValid = useCallback((model: ModelKey) => {
-    const provider = sync.data.provider.find((x) => x.id === model.providerID)
+    const provider = syncDataRef.current.provider.find((x) => x.id === model.providerID)
     if (!provider) return false
     return provider.model === model.modelID || provider.connected
-  }, [sync.data.provider])
+  }, [])
 
   // 初始化默认 agent
   useEffect(() => {
     if (state.agentId !== undefined) return
-    if (sync.data.agent.length > 0) {
-      dispatch({ type: "SET_AGENT", agentId: sync.data.agent[0].id })
+    if (syncDataRef.current.agent.length > 0) {
+      dispatch({ type: "SET_AGENT", agentId: syncDataRef.current.agent[0].id })
     }
   }, [sync.data.agent, state.agentId])
 
   // ---- Agent ----
 
-  const agentList = useCallback(() => sync.data.agent, [sync.data.agent])
+  const agentList = useCallback(() => syncDataRef.current.agent, [])
 
   const agentCurrent = useCallback(() => {
-    return sync.data.agent.find((a) => a.id === state.agentId) ?? sync.data.agent.at(0)
-  }, [sync.data.agent, state.agentId])
+    return syncDataRef.current.agent.find((a) => a.id === state.agentId) ?? syncDataRef.current.agent.at(0)
+  }, [state.agentId])
 
   const agentSet = useCallback((id: string) => {
-    if (!sync.data.agent.some((a) => a.id === id)) {
+    if (!syncDataRef.current.agent.some((a) => a.id === id)) {
       toast.show({ variant: "warning", message: `Agent not found: ${id}`, duration: 3000 })
       return
     }
     dispatch({ type: "SET_AGENT", agentId: id })
-  }, [sync.data.agent, toast])
+  }, [toast])
 
   const agentMove = useCallback((direction: 1 | -1) => {
-    const agents = sync.data.agent
+    const agents = syncDataRef.current.agent
     if (agents.length === 0) return
     const currentIdx = agents.findIndex((a) => a.id === state.agentId)
     let next = currentIdx + direction
     if (next < 0) next = agents.length - 1
     if (next >= agents.length) next = 0
     dispatch({ type: "SET_AGENT", agentId: agents[next].id })
-  }, [sync.data.agent, state.agentId])
+  }, [state.agentId])
 
   // ---- Model ----
 
   const fallbackModel = useCallback((): ModelKey | undefined => {
     // 优先使用 SyncProvider 中的 config.model
-    const configModel = sync.data.config.model as string | undefined
+    const configModel = syncDataRef.current.config.model as string | undefined
     if (configModel) {
       const parsed = parseModel(configModel)
       if (isModelValid(parsed)) return parsed
@@ -163,10 +167,10 @@ export function LocalProvider({ children }: { children: React.ReactNode }) {
       if (isModelValid(item)) return item
     }
     // 最后用第一个 provider 的默认 model
-    const provider = sync.data.provider[0]
+    const provider = syncDataRef.current.provider[0]
     if (!provider) return undefined
     return { providerID: provider.id, modelID: provider.model }
-  }, [sync.data.config, sync.data.provider, state.recentModels, isModelValid])
+  }, [state.recentModels, isModelValid])
 
   const modelCurrent = useCallback((): ModelKey | undefined => {
     const agent = agentCurrent()
@@ -180,12 +184,12 @@ export function LocalProvider({ children }: { children: React.ReactNode }) {
   const modelParsed = useCallback(() => {
     const value = modelCurrent()
     if (!value) return { provider: "Connect a provider", model: "No provider selected" }
-    const provider = sync.data.provider.find((x) => x.id === value.providerID)
+    const provider = syncDataRef.current.provider.find((x) => x.id === value.providerID)
     return {
       provider: provider?.name ?? value.providerID,
       model: value.modelID,
     }
-  }, [modelCurrent, sync.data.provider])
+  }, [modelCurrent])
 
   const modelSet = useCallback((model: ModelKey, options?: { recent?: boolean }) => {
     if (!isModelValid(model)) {

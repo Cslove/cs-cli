@@ -1,5 +1,5 @@
 // 对标 opencode 的 cli/cmd/tui/app.tsx —— TUI 根组件
-import React, { useEffect } from "react"
+import React, { useEffect, useRef } from "react"
 import { Box, Text, useInput, useApp } from "ink"
 import { useTerminalSize } from "./hook/useTerminalSize.js"
 import { ApiProvider } from "./context/api.js"
@@ -92,6 +92,10 @@ function AppContent({ model }: { model?: string }) {
 
   const sessionId = route.type === "session" ? route.sessionId : undefined
 
+  // 用 ref 读取最新的 sync.data.session，避免 useEffect 依赖 sync.data.session 导致高频重执行
+  const syncSessionRef = useRef(sync.data.session)
+  syncSessionRef.current = sync.data.session
+
   useEffect(() => {
     const unregister = command.register([
       {
@@ -152,13 +156,13 @@ function AppContent({ model }: { model?: string }) {
     if (route.type === "home") {
       setTerminalTitle("CS CLI")
     } else if (route.type === "session") {
-      const session = sync.data.session.find((s: { id: string }) => s.id === sessionId)
+      const session = syncSessionRef.current.find((s: { id: string }) => s.id === sessionId)
       const title = session?.title && session.title !== "New Session"
         ? `CS | ${session.title.length > 40 ? session.title.slice(0, 37) + "..." : session.title}`
         : "CS CLI"
       setTerminalTitle(title)
     }
-  }, [route.type, sessionId, sync.data.session])
+  }, [route.type, sessionId])
 
   useEffect(() => {
     const unsubs: Array<() => void> = []

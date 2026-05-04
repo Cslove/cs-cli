@@ -160,12 +160,14 @@ function syncReducer(state: SyncState, action: SyncAction): SyncState {
       if (!parts) return state
       const idx = parts.findIndex((p) => p.id === action.partId)
       if (idx < 0) return state
-      const next = [...parts]
-      const existing = next[idx] as unknown as Record<string, unknown>
+      // 直接原地修改：由于 batchedUpdates 保证了同一批 dispatch 只触发一次 commit，
+      // 且 reducer 的多次执行中只有最终 state 会被使用，所以原地修改是安全的
+      const existing = parts[idx] as unknown as Record<string, unknown>
       const field = action.field as keyof Part
       const prev = (existing[field] as string) ?? ""
-      next[idx] = { ...next[idx], [field]: prev + action.delta }
-      return { ...state, part: { ...state.part, [action.messageId]: next } }
+      parts[idx] = { ...parts[idx], [field]: prev + action.delta }
+      // 触发 React 检测变化：创建新的 part 引用（浅拷贝最外层）
+      return { ...state, part: { ...state.part, [action.messageId]: [...parts] } }
     }
 
     case "PART_REMOVE": {
@@ -331,6 +333,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   }, [api])
 
   // ---- SSE Event Subscriptions ----
+  // 使用 ref 存储最新的 state，避免 useEffect 依赖 state 导致反复重新订阅
+  const stateRef = useRef(state)
+  stateRef.current = state
 
   useEffect(() => {
     const unsubscribers: Array<() => void> = []
@@ -344,7 +349,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     // session.updated → upsert
     unsubscribers.push(event.on("session.updated", (data) => {
       const d = data as { id: string; title?: string; model?: string }
-      const existing = state.session.find((s) => s.id === d.id)
+      const existing = stateRef.current.session.find((s) => s.id === d.id)
       dispatch({
         type: "SESSION_UPSERT",
         session: {
@@ -442,7 +447,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     unsubscribers.push(event.on("message.token", (data) => {
       const d = data as { sessionId: string; token: string }
       // 如果该 session 有 messages 且最后一条是 assistant，追加 token
-      const messages = state.message[d.sessionId] ?? []
+      const messages = stateRef.current.message[d.sessionId] ?? []
       const last = messages.at(-1)
       if (last && last.role === "assistant") {
         dispatch({
@@ -456,7 +461,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     return () => {
       for (const unsub of unsubscribers) unsub()
     }
-  }, [event, bootstrap, state.session, state.message])
+  }, [event, bootstrap])
 
   // ---- Mount: bootstrap ----
 

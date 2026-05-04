@@ -17,6 +17,8 @@ import { usePromptHistory } from "../context/prompt-history.js"
 import { useSync } from "../context/sync.js"
 import { useLocal } from "../context/local.js"
 import { useTerminalSize } from "../hook/useTerminalSize.js"
+import { useAutocomplete } from "../hook/useAutocomplete.js"
+import { AutocompletePopup } from "./AutocompletePopup.js"
 
 // ---- Placeholders ----
 
@@ -63,6 +65,16 @@ export function PromptInput(props: PromptInputProps) {
   const local = useLocal()
   const { exit } = useApp()
   const { columns } = useTerminalSize()
+
+  // ---- Autocomplete ----
+  const autocomplete = useAutocomplete({
+    onInsert: (result) => {
+      inputRef.current = result.input
+      cursorRef.current = result.cursor
+      syncRender()
+    },
+  })
+
   // ---- 真实输入状态（ref，不触发渲染） ----
   const inputRef = useRef(stashed?.input ?? "")
   const cursorRef = useRef(stashed?.cursor ?? 0)
@@ -76,7 +88,7 @@ export function PromptInput(props: PromptInputProps) {
     cursor: stashed?.cursor ?? 0,
     mode: "normal",
   }))
-  const [placeholderIndex, setPlaceholderIndex] = useState(0)
+  const placeholderIndex = useRef(Math.floor(Math.random() * (modeRef.current === "shell" ? PLACEHOLDERS_SHELL.length : PLACEHOLDERS_NORMAL.length)))
   const timerId = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ---- 批量更新渲染：多个按键合并为一次渲染（32ms 合并窗口 ~30fps） ----
@@ -116,15 +128,6 @@ export function PromptInput(props: PromptInputProps) {
     }
   }, [])
 
-  // ---- Placeholder 轮换 ----
-  useEffect(() => {
-    const placeholders = modeRef.current === "shell" ? PLACEHOLDERS_SHELL : PLACEHOLDERS_NORMAL
-    const timer = setInterval(() => {
-      setPlaceholderIndex((i) => (i + 1) % placeholders.length)
-    }, 4000)
-    return () => clearInterval(timer)
-  }, [display.mode])
-
   // ---- 当前 agent/model 信息 ----
   const currentAgent = local.agent.current()
   const currentModel = local.model.current()
@@ -135,6 +138,7 @@ export function PromptInput(props: PromptInputProps) {
   const handleSubmit = useCallback(async (text: string) => {
     if (submitted.current) return
     if (props.disabled) return
+    if (autocomplete.visible) return
     const trimmed = text.trim()
     if (!trimmed) return
 
@@ -160,7 +164,7 @@ export function PromptInput(props: PromptInputProps) {
       submitted.current = false
       props.onSubmit?.()
     }
-  }, [props.disabled, props.onSubmit, createSession, navigate, toast, promptHistory, exit, syncRender])
+  }, [props.disabled, props.onSubmit, createSession, navigate, toast, promptHistory, exit, syncRender, autocomplete.visible])
 
   // ---- 绑定 PromptRef，让外部可以操作输入框 ----
   // 注意：这里读取 inputRef 而非 displayInput，确保外部拿到的是最新值
@@ -195,11 +199,19 @@ export function PromptInput(props: PromptInputProps) {
     inputRef.current = next
     cursorRef.current = cursor + text.length
     scheduleRender()
+    // 粘贴后隐藏 autocomplete（对标 opencode onPaste 行为）
+    if (autocomplete.visible) autocomplete.hide()
   })
 
   // ---- 键盘输入 ----
   useInput((ch, key) => {
     if (props.visible === false || props.disabled) return
+
+    // Autocomplete 键盘优先处理（对标 opencode 的 autocomplete.onKeyDown）
+    if (autocomplete.visible) {
+      if (autocomplete.handleKey(ch, key)) return
+    }
+
     if (key.escape) {
       if (modeRef.current === "shell") {
         modeRef.current = "normal"
@@ -209,6 +221,7 @@ export function PromptInput(props: PromptInputProps) {
     }
 
     if (key.return) {
+      if (autocomplete.visible) return
       if (inputRef.current.trim()) handleSubmit(inputRef.current)
       return
     }
@@ -216,7 +229,7 @@ export function PromptInput(props: PromptInputProps) {
     // ! 或 R 在空输入时进入 shell 模式
     if ((ch === "!" || ch === "R") && cursorRef.current === 0 && inputRef.current === "") {
       modeRef.current = "shell"
-      setPlaceholderIndex(0)
+      placeholderIndex.current = Math.floor(Math.random() * PLACEHOLDERS_SHELL.length)
       scheduleRender()
       return
     }
@@ -238,6 +251,7 @@ export function PromptInput(props: PromptInputProps) {
     if (key.backspace) {
       if (modeRef.current === "shell" && cursorRef.current === 0 && inputRef.current === "") {
         modeRef.current = "normal"
+        placeholderIndex.current = Math.floor(Math.random() * PLACEHOLDERS_NORMAL.length)
         scheduleRender()
         return
       }
@@ -246,6 +260,7 @@ export function PromptInput(props: PromptInputProps) {
         inputRef.current = inputRef.current.slice(0, c - 1) + inputRef.current.slice(c)
         cursorRef.current = c - 1
         scheduleRender()
+        autocomplete.onInput(inputRef.current, cursorRef.current)
       }
       return
     }
@@ -254,6 +269,7 @@ export function PromptInput(props: PromptInputProps) {
       if (c < inputRef.current.length) {
         inputRef.current = inputRef.current.slice(0, c) + inputRef.current.slice(c + 1)
         scheduleRender()
+        autocomplete.onInput(inputRef.current, cursorRef.current)
       }
       return
     }
@@ -286,6 +302,8 @@ export function PromptInput(props: PromptInputProps) {
       inputRef.current = inputRef.current.slice(0, c) + ch + inputRef.current.slice(c)
       cursorRef.current = c + ch.length
       scheduleRender()
+      // 对标 opencode onContentChange → autocomplete.onInput
+      autocomplete.onInput(inputRef.current, cursorRef.current)
     }
   })
 
@@ -298,8 +316,8 @@ export function PromptInput(props: PromptInputProps) {
 
   const placeholders = mode === "shell" ? PLACEHOLDERS_SHELL : PLACEHOLDERS_NORMAL
   const placeholderText = mode === "shell"
-    ? `Run a command... "${placeholders[placeholderIndex % placeholders.length]}"`
-    : `Ask anything... "${placeholders[placeholderIndex % placeholders.length]}"`
+    ? `Run a command... "${placeholders[placeholderIndex.current % placeholders.length]}"`
+    : `Ask anything... "${placeholders[placeholderIndex.current % placeholders.length]}"`
 
   const borderColor = mode === "shell" ? "yellow" : "magenta"
 
@@ -313,7 +331,14 @@ export function PromptInput(props: PromptInputProps) {
   }, [input, cursor])
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" width="100%">
+      {/* 对标 opencode：Autocomplete 绝对定位浮层，不改变输入框布局流 */}
+      <AutocompletePopup
+        visible={autocomplete.visible}
+        options={autocomplete.options}
+        selectedIndex={autocomplete.selectedIndex}
+        width={Math.floor(columns * 0.7)}
+      />
       <Box
         borderStyle="bold"
         borderRight={false}
