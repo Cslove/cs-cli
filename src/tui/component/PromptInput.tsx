@@ -68,13 +68,13 @@ export function PromptInput(props: PromptInputProps) {
   const { columns } = useTerminalSize()
 
   // ---- Autocomplete ----
-  // const autocomplete = useAutocomplete({
-  //   onInsert: (result) => {
-  //     inputRef.current = result.input
-  //     cursorRef.current = result.cursor
-  //     syncRender()
-  //   },
-  // })
+  const autocomplete = useAutocomplete({
+    onInsert: (result) => {
+      inputRef.current = result.input
+      cursorRef.current = result.cursor
+      syncRender()
+    },
+  })
 
   // ---- 真实输入状态（ref，不触发渲染） ----
   const inputRef = useRef(stashed?.input ?? "")
@@ -139,7 +139,7 @@ export function PromptInput(props: PromptInputProps) {
   const handleSubmit = useCallback(async (text: string) => {
     if (submitted.current) return
     if (props.disabled) return
-    // if (autocomplete.visible) return
+    if (autocomplete.visible) return
     const trimmed = text.trim()
     if (!trimmed) return
 
@@ -204,7 +204,7 @@ export function PromptInput(props: PromptInputProps) {
     cursorRef.current = cursor + text.length
     scheduleRender()
     // 粘贴后隐藏 autocomplete（对标 opencode onPaste 行为）
-    // if (autocomplete.visible) autocomplete.hide()
+    if (autocomplete.visible) autocomplete.hide()
   })
 
   // ---- 键盘输入 ----
@@ -212,9 +212,9 @@ export function PromptInput(props: PromptInputProps) {
     if (props.visible === false || props.disabled) return
 
     // Autocomplete 键盘优先处理（对标 opencode 的 autocomplete.onKeyDown）
-    // if (autocomplete.visible) {
-    //   if (autocomplete.handleKey(ch, key)) return
-    // }
+    if (autocomplete.visible) {
+      if (autocomplete.handleKey(ch, key)) return
+    }
 
     if (key.escape) {
       if (modeRef.current === "shell") {
@@ -225,7 +225,7 @@ export function PromptInput(props: PromptInputProps) {
     }
 
     if (key.return) {
-      // if (autocomplete.visible) return
+      if (autocomplete.visible) return
       if (inputRef.current.trim()) handleSubmit(inputRef.current)
       return
     }
@@ -264,7 +264,7 @@ export function PromptInput(props: PromptInputProps) {
         inputRef.current = inputRef.current.slice(0, c - 1) + inputRef.current.slice(c)
         cursorRef.current = c - 1
         scheduleRender()
-        // autocomplete.onInput(inputRef.current, cursorRef.current)
+        autocomplete.onInput(inputRef.current, cursorRef.current)
       }
       return
     }
@@ -273,7 +273,7 @@ export function PromptInput(props: PromptInputProps) {
       if (c < inputRef.current.length) {
         inputRef.current = inputRef.current.slice(0, c) + inputRef.current.slice(c + 1)
         scheduleRender()
-        // autocomplete.onInput(inputRef.current, cursorRef.current)
+        autocomplete.onInput(inputRef.current, cursorRef.current)
       }
       return
     }
@@ -307,7 +307,7 @@ export function PromptInput(props: PromptInputProps) {
       cursorRef.current = c + ch.length
       scheduleRender()
       // 对标 opencode onContentChange → autocomplete.onInput
-      // autocomplete.onInput(inputRef.current, cursorRef.current)
+      autocomplete.onInput(inputRef.current, cursorRef.current)
     }
   })
 
@@ -339,12 +339,12 @@ export function PromptInput(props: PromptInputProps) {
   return (
     <Box flexDirection="column" width="100%">
       {/* 对标 opencode：Autocomplete 绝对定位浮层，不改变输入框布局流 */}
-      {/* <AutocompletePopup
+      <AutocompletePopup
         visible={autocomplete.visible}
         options={autocomplete.options}
         selectedIndex={autocomplete.selectedIndex}
         width={Math.floor(columns * 0.7)}
-      /> */}
+      />
       <Box
         borderStyle="bold"
         borderRight={false}
