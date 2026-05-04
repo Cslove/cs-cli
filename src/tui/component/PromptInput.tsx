@@ -17,7 +17,7 @@ import { usePromptHistory } from "../context/prompt-history.js"
 import { useSync } from "../context/sync.js"
 import { useLocal } from "../context/local.js"
 import { useTerminalSize } from "../hook/useTerminalSize.js"
-import { useAutocomplete } from "../hook/useAutocomplete.js"
+import { useAutocomplete, type MentionSpan } from "../hook/useAutocomplete.js"
 import { AutocompletePopup } from "./AutocompletePopup.js"
 import { debug } from "../util/debug.js"
 
@@ -38,6 +38,43 @@ const PLACEHOLDERS_SHELL = [
 // ---- Stash (跨路由保存未提交输入，对标 opencode 的 let stashed) ----
 
 let stashed: { input: string; cursor: number } | undefined
+
+// ---- Mention Rendering Segments ----
+// 对标 opencode extmark + fileStyleId/agentStyleId：将 input 拆分为着色片段
+
+interface RenderSegment {
+  start: number
+  end: number
+  text: string
+  type: "agent" | "file" | "text"
+}
+
+function buildSegments(input: string, mentions: MentionSpan[]): RenderSegment[] {
+  if (mentions.length === 0) {
+    return input ? [{ start: 0, end: input.length, text: input, type: "text" as const }] : []
+  }
+
+  const sorted = [...mentions].sort((a, b) => a.start - b.start)
+  const segments: RenderSegment[] = []
+  let pos = 0
+
+  for (const mention of sorted) {
+    // mention 之前的普通文本
+    if (pos < mention.start) {
+      segments.push({ start: pos, end: mention.start, text: input.slice(pos, mention.start), type: "text" })
+    }
+    // mention 本身
+    segments.push({ start: mention.start, end: mention.end, text: mention.text, type: mention.type })
+    pos = mention.end
+  }
+
+  // 最后一段普通文本
+  if (pos < input.length) {
+    segments.push({ start: pos, end: input.length, text: input.slice(pos), type: "text" })
+  }
+
+  return segments
+}
 
 // ---- Props ----
 
@@ -260,11 +297,21 @@ export function PromptInput(props: PromptInputProps) {
         return
       }
       if (cursorRef.current > 0) {
-        const c = cursorRef.current
-        inputRef.current = inputRef.current.slice(0, c - 1) + inputRef.current.slice(c)
-        cursorRef.current = c - 1
-        scheduleRender()
-        autocomplete.onInput(inputRef.current, cursorRef.current)
+        // 对标 opencode：backspace 到 mention 边界时整块删除（而非逐字符）
+        const mentionSpan = autocomplete.getMentionBefore(cursorRef.current)
+        if (mentionSpan) {
+          const result = autocomplete.deleteMention(mentionSpan)
+          inputRef.current = result.input
+          cursorRef.current = result.cursor
+          syncRender()
+          autocomplete.onInput(inputRef.current, cursorRef.current)
+        } else {
+          const c = cursorRef.current
+          inputRef.current = inputRef.current.slice(0, c - 1) + inputRef.current.slice(c)
+          cursorRef.current = c - 1
+          scheduleRender()
+          autocomplete.onInput(inputRef.current, cursorRef.current)
+        }
       }
       return
     }
@@ -334,7 +381,15 @@ export function PromptInput(props: PromptInputProps) {
     return { before, cursorChar, after, cursorBlockWidth }
   }, [input, cursor])
 
+  // 对标 opencode extmark + fileStyleId/agentStyleId：根据 mention spans 分段着色
+  // agent = cyan 背景，file = blue 背景，普通文本 = 白色
+  const segments = useMemo(() => buildSegments(input, autocomplete.mentions), [input, autocomplete.mentions])
+
   debug.log("PromptInput", { input, cursor, mode })
+
+  // 判断光标所在 segment 的颜色（用于 cursorChar 的反色）
+  const cursorSegment = segments.find((s: RenderSegment) => cursor >= s.start && cursor < s.end)
+  const cursorBgColor = cursorSegment?.type === "agent" ? "cyan" : cursorSegment?.type === "file" ? "blue" : undefined
 
   return (
     <Box flexDirection="column" width="100%">
@@ -362,13 +417,37 @@ export function PromptInput(props: PromptInputProps) {
         <Box flexDirection="column">
           {input ? (
             <Text>
-              <Text color="white">{before}</Text>
-              {cursorChar ? (
-                <Text color="white" backgroundColor={borderColor}>{cursorChar}</Text>
-              ) : (
-                <Text backgroundColor="white">{" ".repeat(cursorBlockWidth)}</Text>
+              {segments.map((seg: RenderSegment, i: number) => {
+                // 光标在这个 segment 内：拆分为光标前 / cursorChar / 光标后
+                if (cursor >= seg.start && cursor < seg.end) {
+                  const segBefore = seg.text.slice(0, cursor - seg.start)
+                  const segCursor = seg.text[cursor - seg.start]
+                  const segAfter = seg.text.slice(cursor - seg.start + 1)
+                  const color = seg.type === "agent" ? "black" : seg.type === "file" ? "white" : "white"
+                  const bg = seg.type === "agent" ? "cyan" : seg.type === "file" ? "blue" : undefined
+                  return <React.Fragment key={i}>
+                    {segBefore && <Text color={color} backgroundColor={bg}>{segBefore}</Text>}
+                    {segCursor ? (
+                      <Text color="white" backgroundColor={cursorBgColor ?? borderColor}>{segCursor}</Text>
+                    ) : (
+                      <Text backgroundColor="white">{" "}</Text>
+                    )}
+                    {segAfter && <Text color={color} backgroundColor={bg}>{segAfter}</Text>}
+                  </React.Fragment>
+                }
+                // 光标不在这个 segment 内
+                if (seg.type === "agent") {
+                  return <Text key={i} color="black" backgroundColor="cyan">{seg.text}</Text>
+                }
+                if (seg.type === "file") {
+                  return <Text key={i} color="white" backgroundColor="blue">{seg.text}</Text>
+                }
+                return <Text key={i} color="white">{seg.text}</Text>
+              })}
+              {/* 光标在末尾（无 segment 覆盖） */}
+              {cursor === input.length && !cursorChar && (
+                <Text backgroundColor="white">{" "}</Text>
               )}
-              <Text color="white">{after}</Text>
             </Text>
           ) : (
             <Text>

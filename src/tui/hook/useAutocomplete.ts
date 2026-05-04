@@ -31,6 +31,22 @@ export interface AutocompleteInsert {
   cursor: number
 }
 
+// ---- Mention Span（对标 opencode extmark + prompt.parts） ----
+// 记录输入字符串中 @agent / @file 的位置和类型，用于：
+// 1. 渲染时着色区分（agent=cyan, file=blue）
+// 2. backspace 时整块删除而非逐字符删除
+
+export interface MentionSpan {
+  /** mention 在 input 中的起始位置（含 '@'） */
+  start: number
+  /** mention 在 input 中的结束位置（不含尾部空格，exclusive） */
+  end: number
+  /** agent 或 file */
+  type: "agent" | "file"
+  /** 完整文本，如 "@Code" 或 "@src/index.ts" */
+  text: string
+}
+
 export type AutocompleteVisible = false | "@" | "/"
 
 export interface UseAutocompleteOptions {
@@ -42,12 +58,18 @@ export interface UseAutocompleteReturn {
   visible: AutocompleteVisible
   options: AutocompleteOption[]
   selectedIndex: number
+  /** 当前所有 mention span，用于渲染着色和整块删除 */
+  mentions: MentionSpan[]
   /** 输入变化时调用，检测触发/隐藏条件 */
   onInput(value: string, cursor: number): void
   /** 键盘事件处理，返回 true 表示已消费（PromptInput 不再处理） */
   handleKey(ch: string, key: Key): boolean
   /** 强制隐藏 */
   hide(): void
+  /** 查找 cursor 之前紧邻的 mention span（用于 backspace 整块删除） */
+  getMentionBefore(cursor: number): MentionSpan | undefined
+  /** 删除指定 mention span 并返回新的 input/cursor */
+  deleteMention(span: MentionSpan): AutocompleteInsert
 }
 
 // ---- Simple Fuzzy Match (对标 opencode fuzzysort) ----
@@ -160,6 +182,11 @@ export function useAutocomplete(opts: UseAutocompleteOptions): UseAutocompleteRe
   const baseOptionsRef = useRef<AutocompleteOption[]>([])
   const searchQueryRef = useRef("")
 
+  // ---- Mention spans（对标 opencode prompt.parts + extmarks） ----
+  const [mentions, setMentions] = useState<MentionSpan[]>([])
+  const mentionsRef = useRef<MentionSpan[]>([])
+  mentionsRef.current = mentions
+
   // 稳定引用：将 context 值存入 ref，避免 onInput/handleKey 闭包过期
   const syncRef = useRef(sync)
   const localRef = useRef(local)
@@ -190,25 +217,48 @@ export function useAutocomplete(opts: UseAutocompleteOptions): UseAutocompleteRe
 
   // ---- Insert Logic ----
 
+  // 校验并修复 mention spans：编辑后文本可能已移动，重新定位或删除失效的 span
+  function validateMentions(input: string, cursor: number) {
+    const valid = mentionsRef.current.filter((span) => {
+      const actual = input.slice(span.start, span.end)
+      return actual === span.text
+    })
+    if (valid.length !== mentionsRef.current.length) {
+      mentionsRef.current = valid
+      setMentions(valid)
+    }
+  }
+
   function insertMention(name: string, type: "agent" | "file") {
     const input = inputRef.current
     const cursor = cursorRef.current
     const triggerIdx = triggerIndexRef.current
     const before = input.slice(0, triggerIdx)
-    const insertText = "@" + name + " "
+    const mentionText = "@" + name
+    const insertText = mentionText + " "
     const newInput = before + insertText + input.slice(cursor)
     const newCursor = before.length + insertText.length
+
+    // 记录 mention span（对标 opencode insertPart + extmark）
+    const span: MentionSpan = {
+      start: triggerIdx,
+      end: triggerIdx + mentionText.length,
+      type,
+      text: mentionText,
+    }
+    // 更新后续 span 的位置（插入点之后的 span 需要偏移）
+    const shift = insertText.length - (cursor - triggerIdx)
+    const updatedMentions = mentionsRef.current
+      .map((s) => s.start >= cursor ? { ...s, start: s.start + shift, end: s.end + shift } : s)
+      .concat(span)
+      .sort((a, b) => a.start - b.start)
+    mentionsRef.current = updatedMentions
+    setMentions(updatedMentions)
 
     if (type === "file") frecencyRef.current.updateFrecency(name)
 
     hide()
     onInsertRef.current({ input: newInput, cursor: newCursor })
-  }
-
-  function insertSlash(name: string) {
-    const newText = "/" + name + " "
-    hide()
-    onInsertRef.current({ input: newText, cursor: newText.length })
   }
 
   // ---- Build Options ----
@@ -261,7 +311,10 @@ export function useAutocomplete(opts: UseAutocompleteOptions): UseAutocompleteRe
         display: slash.display,
         description: slash.description,
         value: slash.display,
-        onSelect: () => insertSlash(slash.display.slice(1)),
+        onSelect: () => {
+          slash.onSelect()
+          onInsertRef.current({ input: "", cursor: 0 })
+        },
       })
     }
 
@@ -272,8 +325,11 @@ export function useAutocomplete(opts: UseAutocompleteOptions): UseAutocompleteRe
       results.push({
         display,
         description: cmd.description,
-        value: cmd.name,
-        onSelect: () => insertSlash(cmd.name),
+        value: cmd.id,
+        onSelect: () => {
+          commandRef.current.trigger(cmd.id)
+          onInsertRef.current({ input: "", cursor: 0 })
+        },
       })
     }
 
@@ -362,6 +418,34 @@ export function useAutocomplete(opts: UseAutocompleteOptions): UseAutocompleteRe
     }
   }, [])
 
+  // ---- Mention helpers ----
+
+  // 查找 cursor 紧邻前面的 mention span（cursor 恰好在 span.end 位置，含尾部空格情况）
+  function getMentionBefore(cursor: number): MentionSpan | undefined {
+    return mentionsRef.current.find((span) => cursor === span.end || cursor === span.end + 1)
+  }
+
+  // 删除指定 mention span，返回新的 input/cursor
+  function deleteMention(span: MentionSpan): AutocompleteInsert {
+    const input = inputRef.current
+    // 删除 mention 文本 + 尾部空格（如果有）
+    const afterMention = input.slice(span.end)
+    const hasTrailingSpace = afterMention[0] === " "
+    const deleteEnd = hasTrailingSpace ? span.end + 1 : span.end
+    const newInput = input.slice(0, span.start) + input.slice(deleteEnd)
+    const newCursor = span.start
+
+    // 更新后续 span 位置
+    const deletedLen = deleteEnd - span.start
+    const updatedMentions = mentionsRef.current
+      .filter((s) => s !== span)
+      .map((s) => s.start >= deleteEnd ? { ...s, start: s.start - deletedLen, end: s.end - deletedLen } : s)
+    mentionsRef.current = updatedMentions
+    setMentions(updatedMentions)
+
+    return { input: newInput, cursor: newCursor }
+  }
+
   // ---- Public API ----
 
   const onInput = useCallback((value: string, cursor: number) => {
@@ -384,6 +468,9 @@ export function useAutocomplete(opts: UseAutocompleteOptions): UseAutocompleteRe
       scheduleFilter()
       return
     }
+
+    // 编辑后校验 mention spans
+    validateMentions(value, cursor)
 
     // Check if autocomplete should open
     if (cursor === 0) return
@@ -464,8 +551,11 @@ export function useAutocomplete(opts: UseAutocompleteOptions): UseAutocompleteRe
     visible,
     options,
     selectedIndex,
+    mentions,
     onInput,
     handleKey,
     hide,
+    getMentionBefore,
+    deleteMention,
   }
 }
