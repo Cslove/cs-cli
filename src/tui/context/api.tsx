@@ -1,5 +1,5 @@
 // 对标 opencode 的 context/sdk.tsx —— API Client + SSE Context
-import React, { createContext, useContext } from "react"
+import React, { createContext, useContext, useMemo } from "react"
 import http from "node:http"
 import type { Session, Message, Project, ProjectCodeFile, BootstrapData, SessionSyncData, Config, Todo, Part } from "../../shared/types.js"
 import { useToast } from "./toast.js"
@@ -50,9 +50,11 @@ const ApiContext = createContext<ApiClient | null>(null)
 
 export function ApiProvider({ serverUrl, children }: { serverUrl: string; children: React.ReactNode }) {
   const toast = useToast()
-  const client = createApiClient(serverUrl, (msg) => {
+  // useMemo 缓存 client，避免每次 ApiProvider re-render 时创建新的 client 对象
+  // 导致所有 useApi() 消费者重渲染 + useCallback([api]) 依赖链全部重建
+  const client = useMemo(() => createApiClient(serverUrl, (msg) => {
     toast.show({ variant: "error", message: msg, duration: 5000 })
-  })
+  }), [serverUrl, toast])
 
   return <ApiContext.Provider value={client}>{children}</ApiContext.Provider>
 }

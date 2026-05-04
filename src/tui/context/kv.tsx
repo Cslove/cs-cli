@@ -1,5 +1,5 @@
 // 对标 opencode 的 context/kv.tsx —— 轻量 KV 持久化存储
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react"
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react"
 import { readFile, writeFile, rename, rm, mkdir } from "node:fs/promises"
 import { join, dirname } from "node:path"
 import { homedir } from "node:os"
@@ -62,8 +62,10 @@ export function KVProvider({ children }: { children: React.ReactNode }) {
     })
   }, [persist])
 
+  const value = useMemo(() => ({ get, set, ready }), [get, set, ready])
+
   return (
-    <ctx.Provider value={{ get, set, ready }}>
+    <ctx.Provider value={value}>
       {children}
     </ctx.Provider>
   )

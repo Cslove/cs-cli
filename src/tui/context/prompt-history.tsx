@@ -1,7 +1,7 @@
 // 对标 opencode 的 component/prompt/history.tsx —— 输入历史记录
 // 支持上下翻页浏览历史输入，对标 shell 的 history 功能
 // 持久化使用 KVProvider 而非 JSONL 文件
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react"
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react"
 import { useKV } from "./kv.js"
 
 // ---- Types ----
@@ -75,8 +75,10 @@ export function PromptHistoryProvider({ children }: { children: React.ReactNode 
     setIndex(0)
   }, [persist])
 
+  const value = useMemo(() => ({ move, append, history }), [move, append, history])
+
   return (
-    <PromptHistoryCtx.Provider value={{ move, append, history }}>
+    <PromptHistoryCtx.Provider value={value}>
       {children}
     </PromptHistoryCtx.Provider>
   )

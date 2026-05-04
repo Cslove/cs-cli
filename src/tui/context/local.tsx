@@ -1,5 +1,5 @@
 // 对标 opencode 的 context/local.tsx —— 本地 UI 状态（agent/model 选择、持久化）
-import React, { createContext, useContext, useReducer, useCallback, useEffect, useRef } from "react"
+import React, { createContext, useContext, useReducer, useCallback, useEffect, useRef, useMemo } from "react"
 import { useSync } from "./sync.js"
 import { useKV } from "./kv.js"
 import { useToast } from "./toast.js"
@@ -259,25 +259,29 @@ export function LocalProvider({ children }: { children: React.ReactNode }) {
   }, [isModelValid, state.favoriteModels, persist])
 
   // ---- Context Value ----
+  // useMemo 缓存 value 和嵌套对象，避免每次 LocalProvider re-render 时所有消费者重渲染
+  const agent = useMemo(() => ({
+    list: agentList,
+    current: agentCurrent,
+    set: agentSet,
+    move: agentMove,
+  }), [agentList, agentCurrent, agentSet, agentMove])
 
-  const value: LocalContextValue = {
-    agent: {
-      list: agentList,
-      current: agentCurrent,
-      set: agentSet,
-      move: agentMove,
-    },
-    model: {
-      current: modelCurrent,
-      parsed: modelParsed,
-      recent: () => state.recentModels,
-      favorite: () => state.favoriteModels,
-      set: modelSet,
-      cycle: modelCycle,
-      cycleFavorite: modelCycleFavorite,
-      toggleFavorite: modelToggleFavorite,
-    },
-  }
+  const model = useMemo(() => ({
+    current: modelCurrent,
+    parsed: modelParsed,
+    recent: () => state.recentModels,
+    favorite: () => state.favoriteModels,
+    set: modelSet,
+    cycle: modelCycle,
+    cycleFavorite: modelCycleFavorite,
+    toggleFavorite: modelToggleFavorite,
+  }), [modelCurrent, modelParsed, state.recentModels, state.favoriteModels, modelSet, modelCycle, modelCycleFavorite, modelToggleFavorite])
+
+  const value = useMemo<LocalContextValue>(() => ({
+    agent,
+    model,
+  }), [agent, model])
 
   return <LocalCtx.Provider value={value}>{children}</LocalCtx.Provider>
 }

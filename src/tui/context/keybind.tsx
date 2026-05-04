@@ -1,6 +1,6 @@
 // 对标 opencode 的 context/keybind.tsx —— 快捷键配置与匹配
 // Ink 的 useInput 提供 (ch, key) 对象，这里提供 keybind 注册与匹配机制
-import React, { createContext, useContext, useCallback, useRef } from "react"
+import React, { createContext, useContext, useCallback, useRef, useMemo } from "react"
 import { useInput, Key } from "ink"
 import { useKV } from "./kv.js"
 
@@ -151,10 +151,11 @@ export function KeybindProvider({ children }: { children: React.ReactNode }) {
   // 加载用户自定义 keybind 映射
   const customKeybinds = kv.ready ? kv.get<Record<string, string>>("keybinds", {}) : {}
 
-  const definitions = DEFAULT_KEYBINDS.map((def) => ({
+  // useMemo 缓存 definitions，避免每次渲染 .map() 创建新数组 → match/print 重建 → value 重建 → 消费者重渲染
+  const definitions = useMemo(() => DEFAULT_KEYBINDS.map((def) => ({
     ...def,
     default: customKeybinds[def.id] ?? def.default,
-  }))
+  })), [customKeybinds])
 
   const getKeybindInfos = useCallback((keybindId: string): KeybindInfo[] => {
     const def = definitions.find((d) => d.id === keybindId)
@@ -198,12 +199,12 @@ export function KeybindProvider({ children }: { children: React.ReactNode }) {
     }
   })
 
-  const value: KeybindContextValue = {
+  const value = useMemo<KeybindContextValue>(() => ({
     definitions,
     match,
     print,
     register,
-  }
+  }), [definitions, match, print, register])
 
   return <KeybindCtx.Provider value={value}>{children}</KeybindCtx.Provider>
 }

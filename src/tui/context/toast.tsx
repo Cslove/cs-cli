@@ -1,5 +1,5 @@
 // 对标 opencode 的 ui/toast.tsx —— 单例通知 + 自动超时
-import React, { createContext, useContext, useState, useCallback, useRef } from "react"
+import React, { createContext, useContext, useState, useCallback, useRef, useMemo } from "react"
 import { Box, Text } from "ink"
 import type { BoxStyle } from "cli-boxes"
 import { useTerminalSize } from "../hook/useTerminalSize.js"
@@ -63,8 +63,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     }
   }, [show])
 
+  const value = useMemo(() => ({ show, error, currentToast }), [show, error, currentToast])
+
   return (
-    <ctx.Provider value={{ show, error, currentToast }}>
+    <ctx.Provider value={value}>
       {children}
     </ctx.Provider>
   )

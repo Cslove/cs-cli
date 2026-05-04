@@ -1,5 +1,5 @@
 // 对标 opencode 的 context/route.tsx —— 路由 Context
-import React, { createContext, useContext, useState, useCallback } from "react"
+import React, { createContext, useContext, useState, useCallback, useMemo } from "react"
 
 export type Route = { type: "home" } | { type: "session"; sessionId: string }
 
@@ -23,7 +23,9 @@ export function RouteProvider({
 
   const navigate = useCallback((r: Route) => setRoute(r), [])
 
-  return <RouteCtx.Provider value={{ route, navigate }}>{children}</RouteCtx.Provider>
+  const value = useMemo(() => ({ route, navigate }), [route, navigate])
+
+  return <RouteCtx.Provider value={value}>{children}</RouteCtx.Provider>
 }
 
 export function useRoute() {

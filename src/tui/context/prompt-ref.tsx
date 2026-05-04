@@ -1,7 +1,7 @@
 // 对标 opencode 的 context/prompt.tsx —— Prompt 组件引用持有者
 // 允许外部代码（如路由、命令面板）操作当前 Prompt 组件
 // 纯内存状态，无需持久化
-import React, { createContext, useContext, useState, useCallback } from "react"
+import React, { createContext, useContext, useState, useCallback, useMemo } from "react"
 
 // ---- Types ----
 
@@ -34,10 +34,11 @@ const PromptRefCtx = createContext<PromptRefContextValue | null>(null)
 export function PromptRefProvider({ children }: { children: React.ReactNode }) {
   const [ref, setRef] = useState<PromptRef | undefined>(undefined)
 
-  const value: PromptRefContextValue = {
+  // useMemo 确保 value 对象稳定，避免每次渲染创建新引用导致消费者无限重渲染
+  const value = useMemo<PromptRefContextValue>(() => ({
     current: ref,
     set: setRef,
-  }
+  }), [ref])
 
   return (
     <PromptRefCtx.Provider value={value}>

@@ -1,6 +1,6 @@
 // 对标 opencode 的 context/sync.tsx —— SyncProvider
 // 中央状态管理：bootstrap 初始化 + SSE 事件驱动更新 + session 按需同步
-import React, { createContext, useContext, useReducer, useEffect, useCallback, useRef } from "react"
+import React, { createContext, useContext, useReducer, useEffect, useCallback, useRef, useMemo } from "react"
 import { useApi } from "./api.js"
 import { useEvent } from "./event.js"
 import { useProject } from "./project.js"
@@ -470,19 +470,22 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   }, [bootstrap])
 
   // ---- Context value ----
+  // useMemo 缓存 value 和嵌套对象，只有当实际依赖变化时才创建新引用
+  // 避免每次 dispatch 后所有 useSync() 消费者重渲染
+  const session = useMemo(() => ({
+    get: sessionGet,
+    refresh: sessionRefresh,
+    status: sessionStatus,
+    sync: sessionSync,
+  }), [sessionGet, sessionRefresh, sessionStatus, sessionSync])
 
-  const value: SyncContextValue = {
+  const value = useMemo<SyncContextValue>(() => ({
     data: state,
     get status() { return state.status },
     get ready() { return state.status !== "loading" },
     bootstrap,
-    session: {
-      get: sessionGet,
-      refresh: sessionRefresh,
-      status: sessionStatus,
-      sync: sessionSync,
-    },
-  }
+    session,
+  }), [state, bootstrap, session])
 
   return <SyncCtx.Provider value={value}>{children}</SyncCtx.Provider>
 }

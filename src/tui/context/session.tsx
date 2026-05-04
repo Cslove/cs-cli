@@ -1,5 +1,5 @@
 // 对标 opencode 的 context/sync.tsx —— Session 状态 Context
-import React, { createContext, useContext, useReducer, useEffect, useCallback } from "react"
+import React, { createContext, useContext, useReducer, useEffect, useCallback, useMemo } from "react"
 import { useApi } from "./api.js"
 import { useEvent } from "./event.js"
 import type { Session, Message } from "../../shared/types.js"
@@ -128,8 +128,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     if (list) dispatch({ type: "SET_LIST", list })
   }, [api])
 
+  const value = useMemo(() => ({ state, createSession, sendMessage, loadSession, loadSessionList }), [state, createSession, sendMessage, loadSession, loadSessionList])
+
   return (
-    <SessionCtx.Provider value={{ state, createSession, sendMessage, loadSession, loadSessionList }}>
+    <SessionCtx.Provider value={value}>
       {children}
     </SessionCtx.Provider>
   )
