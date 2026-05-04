@@ -8,7 +8,6 @@ import { useKV } from "./kv.js"
 
 export interface PromptInfo {
   input: string
-  mode?: "normal" | "shell"
   parts?: Array<{ type: string; [key: string]: unknown }>
 }
 

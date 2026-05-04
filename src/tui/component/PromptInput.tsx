@@ -23,16 +23,10 @@ import { debug } from "../util/debug.js"
 
 // ---- Placeholders ----
 
-const PLACEHOLDERS_NORMAL = [
+const PLACEHOLDERS = [
   "Fix a TODO in the codebase",
   "What is the tech stack of this project?",
   "Fix broken tests",
-]
-
-const PLACEHOLDERS_SHELL = [
-  "ls -la",
-  "git status",
-  "pwd",
 ]
 
 // ---- Stash (跨路由保存未提交输入，对标 opencode 的 let stashed) ----
@@ -116,17 +110,15 @@ export function PromptInput(props: PromptInputProps) {
   // ---- 真实输入状态（ref，不触发渲染） ----
   const inputRef = useRef(stashed?.input ?? "")
   const cursorRef = useRef(stashed?.cursor ?? 0)
-  const modeRef = useRef<"normal" | "shell">("normal")
   const submitted = useRef(false)
 
   // ---- 单一渲染状态（3 合 1，减少 setState 调用次数） ----
-  type DisplayState = { input: string; cursor: number; mode: "normal" | "shell" }
+  type DisplayState = { input: string; cursor: number }
   const [display, setDisplay] = useState<DisplayState>(() => ({
     input: stashed?.input ?? "",
     cursor: stashed?.cursor ?? 0,
-    mode: "normal",
   }))
-  const placeholderIndex = useRef(Math.floor(Math.random() * (modeRef.current === "shell" ? PLACEHOLDERS_SHELL.length : PLACEHOLDERS_NORMAL.length)))
+  const placeholderIndex = useRef(Math.floor(Math.random() * PLACEHOLDERS.length))
   const timerId = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ---- 批量更新渲染：多个按键合并为一次渲染（32ms 合并窗口 ~30fps） ----
@@ -134,7 +126,7 @@ export function PromptInput(props: PromptInputProps) {
     if (timerId.current !== null) clearTimeout(timerId.current)
     timerId.current = setTimeout(() => {
       timerId.current = null
-      setDisplay({ input: inputRef.current, cursor: cursorRef.current, mode: modeRef.current })
+      setDisplay({ input: inputRef.current, cursor: cursorRef.current })
     }, 32)
   }, [])
 
@@ -144,7 +136,7 @@ export function PromptInput(props: PromptInputProps) {
       clearTimeout(timerId.current)
       timerId.current = null
     }
-    setDisplay({ input: inputRef.current, cursor: cursorRef.current, mode: modeRef.current })
+    setDisplay({ input: inputRef.current, cursor: cursorRef.current })
   }, [])
 
   // ---- 恢复 stash ----
@@ -189,9 +181,8 @@ export function PromptInput(props: PromptInputProps) {
     submitted.current = true
     inputRef.current = ""
     cursorRef.current = 0
-    modeRef.current = "normal"
     syncRender()
-    promptHistory.append({ input: trimmed, mode: modeRef.current })
+    promptHistory.append({ input: trimmed })
 
     try {
       const session = await createSession()
@@ -222,7 +213,6 @@ export function PromptInput(props: PromptInputProps) {
       reset() {
         inputRef.current = ""
         cursorRef.current = 0
-        modeRef.current = "normal"
         syncRender()
       },
       submit() {
@@ -253,25 +243,11 @@ export function PromptInput(props: PromptInputProps) {
       if (autocomplete.handleKey(ch, key)) return
     }
 
-    if (key.escape) {
-      if (modeRef.current === "shell") {
-        modeRef.current = "normal"
-        scheduleRender()
-      }
-      return
-    }
+    if (key.escape) return
 
     if (key.return) {
       if (autocomplete.visible) return
       if (inputRef.current.trim()) handleSubmit(inputRef.current)
-      return
-    }
-
-    // ! 或 R 在空输入时进入 shell 模式
-    if ((ch === "!" || ch === "R") && cursorRef.current === 0 && inputRef.current === "") {
-      modeRef.current = "shell"
-      placeholderIndex.current = Math.floor(Math.random() * PLACEHOLDERS_SHELL.length)
-      scheduleRender()
       return
     }
 
@@ -290,12 +266,6 @@ export function PromptInput(props: PromptInputProps) {
       return
     }
     if (key.backspace) {
-      if (modeRef.current === "shell" && cursorRef.current === 0 && inputRef.current === "") {
-        modeRef.current = "normal"
-        placeholderIndex.current = Math.floor(Math.random() * PLACEHOLDERS_NORMAL.length)
-        scheduleRender()
-        return
-      }
       if (cursorRef.current > 0) {
         // 对标 opencode：backspace 到 mention 边界时整块删除（而非逐字符）
         const mentionSpan = autocomplete.getMentionBefore(cursorRef.current)
@@ -331,7 +301,6 @@ export function PromptInput(props: PromptInputProps) {
       if (item) {
         inputRef.current = item.input
         cursorRef.current = item.input.length
-        if (item.mode) modeRef.current = item.mode
         scheduleRender()
       }
       return
@@ -341,7 +310,6 @@ export function PromptInput(props: PromptInputProps) {
       if (item) {
         inputRef.current = item.input
         cursorRef.current = item.input.length
-        if (item.mode) modeRef.current = item.mode
         scheduleRender()
       }
       return
@@ -363,14 +331,10 @@ export function PromptInput(props: PromptInputProps) {
 
   const input = display.input
   const cursor = display.cursor
-  const mode = display.mode
 
-  const placeholders = mode === "shell" ? PLACEHOLDERS_SHELL : PLACEHOLDERS_NORMAL
-  const placeholderText = mode === "shell"
-    ? `Run a command... "${placeholders[placeholderIndex.current % placeholders.length]}"`
-    : `Ask anything... "${placeholders[placeholderIndex.current % placeholders.length]}"`
+  const placeholderText = `Ask anything... "${PLACEHOLDERS[placeholderIndex.current % PLACEHOLDERS.length]}"`
 
-  const borderColor = mode === "shell" ? "yellow" : "magenta"
+  const borderColor = "magenta"
 
   // useMemo 缓存渲染计算，避免每次渲染重复 stringWidth
   const { before, cursorChar, after, cursorBlockWidth } = useMemo(() => {
@@ -385,7 +349,7 @@ export function PromptInput(props: PromptInputProps) {
   // agent = cyan 背景，file = blue 背景，普通文本 = 白色
   const segments = useMemo(() => buildSegments(input, autocomplete.mentions), [input, autocomplete.mentions])
 
-  debug.log("PromptInput", { input, cursor, mode })
+  debug.log("PromptInput", { input, cursor })
 
   // 判断光标所在 segment 的颜色（用于 cursorChar 的反色）
   const cursorSegment = segments.find((s: RenderSegment) => cursor >= s.start && cursor < s.end)
@@ -457,13 +421,9 @@ export function PromptInput(props: PromptInputProps) {
           )}
           {/* agent/model 信息：输入框内部左下角 */}
           <Box flexDirection="row" gap={1} paddingTop={1}>
-            <Text color={borderColor}>{mode === "shell" ? "Shell" : agentName}</Text>
-            {mode === "normal" && (
-              <>
-                <Text dimColor color="gray">·</Text>
-                <Text dimColor color="gray">{modelName}</Text>
-              </>
-            )}
+            <Text color="magenta">{agentName}</Text>
+            <Text dimColor color="gray">·</Text>
+            <Text dimColor color="gray">{modelName}</Text>
             {/* 右侧额外内容 */}
             {props.right && (
               <>
