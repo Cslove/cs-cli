@@ -20,6 +20,10 @@ export interface ChatPromptRequest {
   sessionId: string
   content: string
   model?: string
+  /** agent 名称，对标 opencode session.prompt.agent */
+  agent?: string
+  /** 扁平化 parts 数组，对标 opencode session.prompt.parts */
+  parts?: PartInput[]
 }
 
 export interface ChatPromptResponse {
@@ -75,7 +79,35 @@ export interface Todo {
   created_at: number
 }
 
-export type PartType = "text" | "tool_call" | "tool_result"
+export type PartType = "text" | "tool_call" | "tool_result" | "file" | "agent"
+
+// ---- 对标 opencode SDK 的 PartInput 类型（提交时使用，不含 id/sessionID/messageID） ----
+
+export interface TextPartInput {
+  type: "text"
+  text: string
+  synthetic?: boolean
+}
+
+export interface FilePartInput {
+  type: "file"
+  mime: string
+  filename?: string
+  url: string
+  source?: {
+    type?: string
+    path: string
+    text?: { value: string; start: number; end: number }
+  }
+}
+
+export interface AgentPartInput {
+  type: "agent"
+  name: string
+  source?: { value: string; start: number; end: number }
+}
+
+export type PartInput = TextPartInput | FilePartInput | AgentPartInput
 
 export interface Part {
   id: string

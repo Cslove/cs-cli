@@ -1,7 +1,7 @@
 // 对标 opencode 的 context/sdk.tsx —— API Client + SSE Context
 import React, { createContext, useContext, useMemo } from "react"
 import http from "node:http"
-import type { Session, Message, Project, ProjectCodeFile, BootstrapData, SessionSyncData, Config, Todo, Part } from "../../shared/types.js"
+import type { Session, Message, Project, ProjectCodeFile, BootstrapData, SessionSyncData, Config, Todo, Part, PartInput } from "../../shared/types.js"
 import { useToast } from "./toast.js"
 
 export interface GlobalEvent {
@@ -20,7 +20,7 @@ interface ApiClient {
     remove: (id: string) => Promise<void | null>
   }
   chat: {
-    prompt: (sessionId: string, content: string, model?: string) => Promise<{ sessionId: string; streaming: boolean } | null>
+    prompt: (sessionId: string, content: string, model?: string, agent?: string, parts?: PartInput[]) => Promise<{ sessionId: string; streaming: boolean } | null>
   }
   message: {
     list: (sessionId: string) => Promise<Message[] | null>
@@ -167,10 +167,10 @@ function createApiClient(baseUrl: string, onError: (msg: string) => void): ApiCl
       remove: (id) => request<void>(`/api/session/${id}`, { method: "DELETE" }),
     },
     chat: {
-      prompt: (sessionId, content, model) =>
+      prompt: (sessionId, content, model, agent, parts) =>
         request("/api/chat/prompt", {
           method: "POST",
-          body: JSON.stringify({ sessionId, content, model }),
+          body: JSON.stringify({ sessionId, content, model, agent, parts }),
         }),
     },
     message: {

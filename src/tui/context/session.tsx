@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useReducer, useEffect, useCallback, useMemo } from "react"
 import { useApi } from "./api.js"
 import { useEvent } from "./event.js"
-import type { Session, Message } from "../../shared/types.js"
+import type { Session, Message, PartInput } from "../../shared/types.js"
 
 interface SessionState {
   current: Session | null
@@ -43,7 +43,7 @@ function reducer(state: SessionState, action: SessionAction): SessionState {
 const SessionCtx = createContext<{
   state: SessionState
   createSession: () => Promise<Session>
-  sendMessage: (content: string) => Promise<void>
+  sendMessage: (content: string, agent?: string, parts?: PartInput[]) => Promise<void>
   loadSession: (id: string) => Promise<void>
   loadSessionList: () => Promise<void>
 } | null>(null)
@@ -85,7 +85,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [api])
 
   const sendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, agent?: string, parts?: PartInput[]) => {
       if (!state.current) return
       dispatch({ type: "SET_LOADING", loading: true })
       dispatch({ type: "CLEAR_STREAM" })
@@ -102,7 +102,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: "ADD_MESSAGE", message: optimisticMsg })
 
       try {
-        const result = await api.chat.prompt(state.current.id, content)
+        const result = await api.chat.prompt(state.current.id, content, undefined, agent, parts)
         if (!result) dispatch({ type: "SET_LOADING", loading: false })
         // streaming 完成后由事件触发 ADD_MESSAGE 和 SET_LOADING
       } catch (e) {

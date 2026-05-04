@@ -3,12 +3,13 @@
 // 持久化使用 KVProvider 而非 JSONL 文件
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react"
 import { useKV } from "./kv.js"
+import type { PartInput } from "../../shared/types.js"
 
 // ---- Types ----
 
 export interface PromptInfo {
   input: string
-  parts?: Array<{ type: string; [key: string]: unknown }>
+  parts?: PartInput[]
 }
 
 const MAX_ENTRIES = 50

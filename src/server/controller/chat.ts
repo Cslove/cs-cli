@@ -4,7 +4,29 @@ import { SessionService } from "../service/session.js"
 import { LlmService } from "../service/llm.js"
 import { PartService } from "../service/part.js"
 import { EventService } from "../service/event.js"
-import type { ChatPromptRequest } from "../../shared/types.js"
+import type { ChatPromptRequest, PartInput } from "../../shared/types.js"
+
+// 对标 opencode submit()：将 parts 数组转换为 LLM 可理解的 content 字符串
+// text parts → 文本内容
+// agent parts → "[Agent: {name}]" 标记
+// file parts → "[File: {path}]" 标记
+function buildContentFromParts(fallbackContent: string, parts?: PartInput[]): string {
+  if (!parts?.length) return fallbackContent
+
+  const fragments: string[] = []
+  for (const part of parts) {
+    if (part.type === "text") {
+      fragments.push(part.text)
+    } else if (part.type === "agent") {
+      fragments.push(`[Agent: ${part.name}]`)
+    } else if (part.type === "file") {
+      const path = part.source?.path ?? part.filename ?? ""
+      fragments.push(`[File: ${path}]`)
+    }
+  }
+
+  return fragments.join("\n") || fallbackContent
+}
 
 @Controller("/api/chat")
 export class ChatController {
@@ -24,13 +46,30 @@ export class ChatController {
   async prompt(@Body() body: ChatPromptRequest) {
     const session = await this.sessionService.getOrCreate(body.sessionId)
 
+    // 对标 opencode：将 parts 数组转换为 LLM 可理解的 content 字符串
+    const content = buildContentFromParts(body.content, body.parts)
+
     // 保存用户消息
     const userMessage = await this.sessionService.addMessage({
       sessionId: session.id,
       role: "user",
-      content: body.content,
+      content,
     })
     this.eventService.emit("message.created", userMessage)
+
+    // 存储用户提交的 parts（对标 opencode message.parts）
+    if (body.parts?.length) {
+      for (const part of body.parts) {
+        await this.partService.create({
+          messageId: userMessage.id,
+          type: part.type,
+          text: part.type === "text" ? part.text
+            : part.type === "agent" ? part.name
+            : part.type === "file" ? (part.filename ?? part.source?.path ?? "")
+            : "",
+        })
+      }
+    }
 
     // 对标 opencode：prompt 开始时标记 session 为 working
     this.eventService.emit("session.status", { sessionID: session.id, status: "working" })

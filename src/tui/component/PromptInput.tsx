@@ -20,6 +20,7 @@ import { useTerminalSize } from "../hook/useTerminalSize.js"
 import { useAutocomplete, type MentionSpan } from "../hook/useAutocomplete.js"
 import { AutocompletePopup } from "./AutocompletePopup.js"
 import { debug } from "../util/debug.js"
+import type { PartInput, AgentPartInput, FilePartInput } from "../../shared/types.js"
 
 // ---- Placeholders ----
 
@@ -88,7 +89,7 @@ export interface PromptInputProps {
 // ---- Component ----
 
 export function PromptInput(props: PromptInputProps) {
-  const { createSession } = useSession()
+  const { createSession, sendMessage } = useSession()
   const { navigate } = useRoute()
   const toast = useToast()
   const promptRef = usePromptRef()
@@ -165,6 +166,7 @@ export function PromptInput(props: PromptInputProps) {
   const modelName = currentModel?.modelID ?? "default"
 
   // ---- 提交逻辑 ----
+  // 对标 opencode submit()：将输入态的虚拟文本 + mention spans 转换为扁平化 parts 数组
   const handleSubmit = useCallback(async (text: string) => {
     if (submitted.current) return
     if (props.disabled) return
@@ -182,18 +184,80 @@ export function PromptInput(props: PromptInputProps) {
     inputRef.current = ""
     cursorRef.current = 0
     syncRender()
-    promptHistory.append({ input: trimmed })
+
+    // === 数据转换：对标 opencode submit() Phase 3 ===
+    // 1. 从 mention spans 构建 agent/file parts
+    // 2. 从输入文本构建 text part
+    // 3. 构建 parts 数组传给 sendMessage
+    const mentions = autocomplete.mentions
+    const parts: PartInput[] = []
+    let inputText = text
+
+    if (mentions.length > 0) {
+      // 对标 opencode：从后往前将 mention 的虚拟文本从 inputText 中剥离
+      // 因为 mention 文本（如 "@Code"）是虚拟占位，实际内容由 part 携带
+      // 剥离后 inputText 只剩普通文本部分
+      const sorted = [...mentions].sort((a, b) => b.start - a.start)
+
+      for (const mention of sorted) {
+        // 从后往前剥离 mention 文本 + 尾部空格
+        const hasTrailingSpace = inputText[mention.end] === " "
+        const deleteEnd = hasTrailingSpace ? mention.end + 1 : mention.end
+        inputText = inputText.slice(0, mention.start) + inputText.slice(deleteEnd)
+
+        // 构建 part（对标 opencode 的 nonTextParts）
+        if (mention.type === "agent") {
+          const agentPart: AgentPartInput = {
+            type: "agent",
+            name: mention.text.slice(1), // 去掉 "@" 前缀
+            source: {
+              value: mention.text,
+              start: mention.start,
+              end: mention.end,
+            },
+          }
+          parts.push(agentPart)
+        } else if (mention.type === "file") {
+          const filePath = mention.text.slice(1) // 去掉 "@" 前缀
+          const filePart: FilePartInput = {
+            type: "file",
+            mime: "text/plain", // 文件引用默认 text/plain
+            url: filePath,
+            source: {
+              path: filePath,
+              text: {
+                value: mention.text,
+                start: mention.start,
+                end: mention.end,
+              },
+            },
+          }
+          parts.push(filePart)
+        }
+      }
+    }
+
+    // 对标 opencode：用户输入文本作为 text part 放在 parts 最前面
+    parts.unshift({ type: "text", text: inputText })
+
+    // 对标 opencode：agent 信息传入请求
+    const agentName = local.agent.current()?.name
+
+    promptHistory.append({ input: trimmed, parts })
+    debug.log("Input: ", { input: trimmed, parts })
 
     try {
       const session = await createSession()
       navigate({ type: "session", sessionId: session.id })
+      // 创建 session 后发送带 parts 的消息
+      await sendMessage(inputText, agentName, parts)
     } catch (e) {
       toast.error(e)
     } finally {
       submitted.current = false
       props.onSubmit?.()
     }
-  }, [props.disabled, props.onSubmit, createSession, navigate, toast, promptHistory, exit, syncRender])
+  }, [props.disabled, props.onSubmit, createSession, navigate, sendMessage, toast, promptHistory, exit, syncRender, autocomplete.mentions, local])
 
   // ---- 绑定 PromptRef，让外部可以操作输入框 ----
   // 注意：这里读取 inputRef 而非 displayInput，确保外部拿到的是最新值
