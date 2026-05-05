@@ -120,6 +120,8 @@ const DEFAULT_KEYBINDS: KeybindDef[] = [
   { id: "command_list", default: "ctrl+p", description: "Open command palette", category: "System" },
   { id: "session_new", default: "ctrl+n", description: "New session", category: "Session" },
   { id: "session_list", default: "ctrl+l", description: "Session list", category: "Session" },
+  { id: "session_delete", default: "ctrl+d", description: "Delete session", category: "Session" },
+  { id: "session_rename", default: "ctrl+r", description: "Rename session", category: "Session" },
   { id: "model_cycle", default: "ctrl+m", description: "Cycle model", category: "Model" },
   { id: "model_favorite", default: "ctrl+shift+m", description: "Cycle favorite model", category: "Model" },
   { id: "agent_next", default: "ctrl+tab", description: "Next agent", category: "Agent" },

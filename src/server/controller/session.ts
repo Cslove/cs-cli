@@ -1,5 +1,5 @@
 // 对标 opencode 的 server/routes/instance/session.ts —— 会话控制器
-import { Controller, Get, Post, Inject, Del, Param } from "@midwayjs/core"
+import { Controller, Get, Post, Put, Inject, Del } from "@midwayjs/core"
 import { Context } from "@midwayjs/koa"
 import { SessionService, type SessionCreateInput } from "../service/session.js"
 import { EventService } from "../service/event.js"
@@ -19,7 +19,8 @@ export class SessionController {
   }
 
   @Get("/:id")
-  async get(@Param() id: string) {
+  async get(ctx: Context) {
+    const id = ctx.params.id
     const session = await this.sessionService.get(id)
     if (!session) throw new Error("Session not found")
     return session
@@ -38,8 +39,23 @@ export class SessionController {
     return session
   }
 
+  @Put("/:id")
+  async update(ctx: Context) {
+    const id = ctx.params.id
+    const body = (ctx.request.body ?? {}) as Record<string, unknown>
+    const title = body.title != null ? String(body.title) : undefined
+    if (title != null) {
+      await this.sessionService.updateTitle(id, title)
+      const session = await this.sessionService.get(id)
+      this.eventService.emit("session.updated", session)
+      return session
+    }
+    return { success: true }
+  }
+
   @Del("/:id")
-  async remove(@Param() id: string) {
+  async remove(ctx: Context) {
+    const id = ctx.params.id
     await this.sessionService.remove(id)
     this.eventService.emit("session.deleted", { id })
     return { success: true }

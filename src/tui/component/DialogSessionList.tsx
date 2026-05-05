@@ -1,19 +1,29 @@
 // 对标 opencode 的 component/dialog-session-list.tsx —— 会话列表选择对话框
-// Ink 版本：简化了 opentui 的 workspace/search/delete 功能，保留核心的会话列表选择
-import React, { useState, useMemo } from "react"
+// Ink 版本：delete(ctrl+d 双击确认) + rename(ctrl+r 行内编辑) + filter 始终显示
+import React, { useState, useMemo, useRef } from "react"
 import { Box, Text, useInput } from "ink"
-import { useDialog, DialogTitle, DialogItem, DialogFooter } from "../context/dialog.js"
+import { useDialog, DialogTitle, DialogItem } from "../context/dialog.js"
 import { useSync } from "../context/sync.js"
 import { useRoute } from "../context/route.js"
 import { useKeybind } from "../context/keybind.js"
+import { useApi } from "../context/api.js"
+import { useToast } from "../context/toast.js"
+
+type Mode = "select" | "rename"
 
 export function DialogSessionList() {
   const dialog = useDialog()
   const route = useRoute()
   const sync = useSync()
   const keybind = useKeybind()
+  const api = useApi()
+  const toast = useToast()
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [filter, setFilter] = useState("")
+  const [toDelete, setToDelete] = useState<string | null>(null)
+  const [mode, setMode] = useState<Mode>("select")
+  const [renameText, setRenameText] = useState("")
+  const renameRef = useRef("")
 
   const currentSessionId = route.route.type === "session" ? route.route.sessionId : undefined
 
@@ -30,22 +40,89 @@ export function DialogSessionList() {
 
   const current = sessions[selectedIndex]
 
+  // ---- Rename 模式键盘处理 ----
   useInput((ch, key) => {
+    if (mode !== "rename") return
+
+    if (key.escape) {
+      setMode("select")
+      return
+    }
+
+    if (key.return) {
+      const newTitle = renameRef.current.trim()
+      if (newTitle && current) {
+        api.session.rename(current.id, newTitle).then((result) => {
+          if (!result) toast.show({ variant: "error", message: "Failed to rename session" })
+        })
+      }
+      setMode("select")
+      return
+    }
+
+    if (key.backspace) {
+      renameRef.current = renameRef.current.slice(0, -1)
+      setRenameText(renameRef.current)
+      return
+    }
+
+    if (ch && !key.ctrl && !key.meta) {
+      renameRef.current += ch
+      setRenameText(renameRef.current)
+    }
+  })
+
+  // ---- 选择模式键盘处理 ----
+  useInput((ch, key) => {
+    if (mode !== "select") return
+
     if (key.upArrow) {
+      setToDelete(null)
       setSelectedIndex((prev) => (prev > 0 ? prev - 1 : sessions.length - 1))
     } else if (key.downArrow) {
+      setToDelete(null)
       setSelectedIndex((prev) => (prev < sessions.length - 1 ? prev + 1 : 0))
     } else if (key.return && current) {
+      // delete 确认态下回车也确认删除
+      if (toDelete === current.id) {
+        void deleteSession(current.id)
+        return
+      }
       route.navigate({ type: "session", sessionId: current.id })
       dialog.clear()
     } else if (key.backspace || key.delete) {
+      if (toDelete) { setToDelete(null); return }
       setFilter((prev) => prev.slice(0, -1))
       setSelectedIndex(0)
     } else if (ch && !key.return && !key.escape && !key.ctrl && !key.meta) {
+      if (toDelete) setToDelete(null)
       setFilter((prev) => prev + ch)
       setSelectedIndex(0)
+    } else if (keybind.match("session_delete", key, ch) && current) {
+      if (toDelete === current.id) {
+        void deleteSession(current.id)
+      } else {
+        setToDelete(current.id)
+      }
+    } else if (keybind.match("session_rename", key, ch) && current) {
+      renameRef.current = current.title
+      setRenameText(current.title)
+      setMode("rename")
+      setToDelete(null)
     }
   })
+
+  async function deleteSession(id: string) {
+    const result = await api.session.remove(id)
+    if (result === null) {
+      toast.show({ variant: "error", message: "Failed to delete session" })
+    }
+    setToDelete(null)
+    // 如果删除的是当前会话，导航回首页
+    if (id === currentSessionId) {
+      route.navigate({ type: "home" })
+    }
+  }
 
   // 按日期分组
   const today = new Date().toDateString()
@@ -57,31 +134,40 @@ export function DialogSessionList() {
     categories.get(cat)!.push(session)
   }
 
-  // 扁平索引映射
-  const flatItems = sessions
-
   return (
     <Box flexDirection="column">
       <DialogTitle>Sessions</DialogTitle>
-      {filter && (
+      {/* filter 始终显示 */}
+      <Box marginBottom={1}>
+        <Text dimColor>Filter: </Text>
+        <Text color={filter ? "cyan" : "gray"}>{filter || "type to search..."}</Text>
+      </Box>
+      {mode === "rename" && current && (
         <Box marginBottom={1}>
-          <Text dimColor>Filter: </Text>
-          <Text color="cyan">{filter}</Text>
+          <Text color="yellow">Rename: </Text>
+          <Text color="white">{renameText}</Text>
+          <Text backgroundColor="white">{" "}</Text>
         </Box>
       )}
       {Array.from(categories.entries()).map(([category, items]) => (
         <Box key={category} flexDirection="column" marginBottom={1}>
           <Text bold color="gray">{category}</Text>
           {items.map((session) => {
-            const globalIdx = flatItems.indexOf(session)
+            const globalIdx = sessions.indexOf(session)
             const isCurrent = session.id === currentSessionId
+            const isDeleting = toDelete === session.id
+            const isRenaming = mode === "rename" && globalIdx === selectedIndex
+            const label = isDeleting
+              ? `Press ${keybind.print("session_delete")} again to confirm`
+              : isRenaming
+                ? renameText
+                : session.title + (isCurrent ? " (current)" : "")
             return (
               <DialogItem
                 key={session.id}
-                label={session.title + (isCurrent ? " (current)" : "")}
-                description={formatTime(session.updated_at)}
+                label={label}
+                description={isDeleting ? undefined : formatTime(session.updated_at)}
                 selected={globalIdx === selectedIndex}
-                keybind={isCurrent ? keybind.print("session_list") : undefined}
               />
             )
           })}
@@ -90,9 +176,11 @@ export function DialogSessionList() {
       {sessions.length === 0 && (
         <Text dimColor>No sessions found</Text>
       )}
-      <DialogFooter>
-        <Text dimColor color="gray"> | ↑↓ Navigate | Enter: Select | Type to filter</Text>
-      </DialogFooter>
+      <Box marginTop={1} flexDirection="row" gap={2}>
+        <Text dimColor color="gray">{keybind.print("session_delete")} delete</Text>
+        <Text dimColor color="gray">{keybind.print("session_rename")} rename</Text>
+        <Text dimColor color="gray">↑↓ navigate</Text>
+      </Box>
     </Box>
   )
 }

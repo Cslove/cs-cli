@@ -45,22 +45,23 @@ export class GlobalController {
 
     // 1. 推送 server.connected
     writeSSE(JSON.stringify({
+      directory: "global",
       payload: { type: "server.connected", properties: {} },
     }))
 
     // 2. heartbeat 每 10s
     const heartbeat = setInterval(() => {
       writeSSE(JSON.stringify({
+        directory: "global",
         payload: { type: "server.heartbeat", properties: {} },
       }))
     }, 10_000)
 
     // 3. 订阅 EventService 事件
+    // EventService.emit 已经将数据包装为 { directory, payload: { type, properties } }
+    // 这里直接转发即可，不要再包装一层
     const handler = (data: unknown) => {
-      writeSSE(JSON.stringify({
-        directory: "global",
-        payload: data,
-      }))
+      writeSSE(JSON.stringify(data))
     }
     this.eventService.on("event", handler)
 

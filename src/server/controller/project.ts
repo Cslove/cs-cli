@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Inject, Param, Query } from "@midwayjs/core"
+import { Controller, Get, Post, Put, Inject, Query } from "@midwayjs/core"
 import { Context } from "@midwayjs/koa"
 import { ProjectService } from "../service/project.js"
 import type { ProjectCodeFile } from "../../shared/types.js"
@@ -14,7 +14,8 @@ export class ProjectController {
   }
 
   @Get("/detail/:id")
-  async get(@Param() id: string) {
+  async get(ctx: Context) {
+    const id = ctx.params.id
     const project = await this.projectService.get(id)
     if (!project) throw new Error("Project not found")
     return project

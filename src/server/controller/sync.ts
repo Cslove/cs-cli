@@ -1,6 +1,6 @@
 // 对标 opencode 的 SyncProvider bootstrap + session sync —— 数据同步控制器
 // 将多个并行请求合并为单次 HTTP 调用，减少 TUI 初始化时的网络开销
-import { Controller, Get, Put, Inject, Param } from "@midwayjs/core"
+import { Controller, Get, Put, Inject } from "@midwayjs/core"
 import { Context } from "@midwayjs/koa"
 import { ProviderService } from "../service/provider.js"
 import { AgentService } from "../service/agent.js"
@@ -76,7 +76,8 @@ export class SyncController {
    * 返回指定 session 的完整数据（session + messages with parts + todos）
    */
   @Get("/session/:id")
-  async sessionSync(@Param() id: string): Promise<SessionSyncData> {
+  async sessionSync(ctx: Context): Promise<SessionSyncData> {
+    const id = ctx.params.id
     const session = await this.sessionService.get(id)
     if (!session) throw new Error("Session not found")
 

@@ -18,7 +18,8 @@ interface ApiClient {
     get: (id: string) => Promise<Session | null>
     create: (input?: { title?: string; parentID?: string }) => Promise<Session | null>
     remove: (id: string) => Promise<void | null>
-  }
+    rename: (id: string, title: string) => Promise<Session | null>
+  },
   chat: {
     prompt: (sessionId: string, content: string, model?: string, agent?: string, parts?: PartInput[]) => Promise<{ sessionId: string; streaming: boolean } | null>
   }
@@ -168,6 +169,10 @@ function createApiClient(baseUrl: string, onError: (msg: string) => void): ApiCl
         body: JSON.stringify(input ?? {}),
       }),
       remove: (id) => request<void>(`/api/session/${id}`, { method: "DELETE" }),
+      rename: (id, title) => request<Session>(`/api/session/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ title }),
+      }),
     },
     chat: {
       prompt: (sessionId, content, model, agent, parts) =>
