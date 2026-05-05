@@ -59,6 +59,10 @@ export function scheduleSave() {
 }
 
 function runMigrations() {
+  // 建表只做最简定义：列名 + 类型 + PRIMARY KEY
+  // 无 REFERENCES / CHECK / ON DELETE CASCADE 等约束
+  // 所有关联、校验、级联删除逻辑由代码层控制，保持最大向后兼容性
+
   db.run(`
     CREATE TABLE IF NOT EXISTS session (
       id TEXT PRIMARY KEY,
@@ -76,8 +80,8 @@ function runMigrations() {
   db.run(`
     CREATE TABLE IF NOT EXISTS message (
       id TEXT PRIMARY KEY,
-      session_id TEXT NOT NULL REFERENCES session(id) ON DELETE CASCADE,
-      role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'system')),
+      session_id TEXT NOT NULL DEFAULT '',
+      role TEXT NOT NULL DEFAULT '',
       content TEXT NOT NULL DEFAULT '',
       model TEXT NOT NULL DEFAULT '',
       created_at INTEGER NOT NULL
@@ -91,7 +95,7 @@ function runMigrations() {
   db.run(`
     CREATE TABLE IF NOT EXISTS project (
       id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
+      name TEXT NOT NULL DEFAULT '',
       code TEXT NOT NULL DEFAULT '[]',
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
@@ -101,15 +105,15 @@ function runMigrations() {
   db.run(`
     CREATE TABLE IF NOT EXISTS config (
       key TEXT PRIMARY KEY,
-      value TEXT NOT NULL
+      value TEXT NOT NULL DEFAULT ''
     );
   `)
 
   db.run(`
     CREATE TABLE IF NOT EXISTS part (
       id TEXT PRIMARY KEY,
-      message_id TEXT NOT NULL REFERENCES message(id) ON DELETE CASCADE,
-      type TEXT NOT NULL CHECK(type IN ('text', 'tool_call', 'tool_result')),
+      message_id TEXT NOT NULL DEFAULT '',
+      type TEXT NOT NULL DEFAULT '',
       text TEXT NOT NULL DEFAULT '',
       tool_name TEXT NOT NULL DEFAULT '',
       tool_input TEXT NOT NULL DEFAULT '',
@@ -122,21 +126,12 @@ function runMigrations() {
     CREATE INDEX IF NOT EXISTS idx_part_message ON part(message_id);
   `)
 
-  // 对标 opencode：新增 slug, version, parent_id 列迁移
-  // ALTER TABLE ADD COLUMN 对已存在的表是安全的（不会影响已有数据）
-  try { db.run("ALTER TABLE session ADD COLUMN slug TEXT NOT NULL DEFAULT ''") } catch {}
-  try { db.run("ALTER TABLE session ADD COLUMN version TEXT NOT NULL DEFAULT '0.0.0'") } catch {}
-  try { db.run("ALTER TABLE session ADD COLUMN parent_id TEXT DEFAULT NULL") } catch {}
-
-  // part 表扩展：支持 file/agent 类型（对标 opencode PartInput）
-  try { db.run("ALTER TABLE part DROP CONSTRAINT IF EXISTS type") } catch {}
-
   db.run(`
     CREATE TABLE IF NOT EXISTS todo (
       id TEXT PRIMARY KEY,
-      session_id TEXT NOT NULL REFERENCES session(id) ON DELETE CASCADE,
+      session_id TEXT NOT NULL DEFAULT '',
       content TEXT NOT NULL DEFAULT '',
-      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'in_progress', 'completed')),
+      status TEXT NOT NULL DEFAULT 'pending',
       created_at INTEGER NOT NULL
     );
   `)
@@ -144,6 +139,11 @@ function runMigrations() {
   db.run(`
     CREATE INDEX IF NOT EXISTS idx_todo_session ON todo(session_id);
   `)
+
+  // 列迁移：ALTER TABLE ADD COLUMN 对已存在的表安全，不会影响已有数据
+  try { db.run("ALTER TABLE session ADD COLUMN slug TEXT NOT NULL DEFAULT ''") } catch {}
+  try { db.run("ALTER TABLE session ADD COLUMN version TEXT NOT NULL DEFAULT '0.0.0'") } catch {}
+  try { db.run("ALTER TABLE session ADD COLUMN parent_id TEXT DEFAULT NULL") } catch {}
 
   saveDatabase()
 }

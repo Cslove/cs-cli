@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Inject, Param, Body, Query } from "@midwayjs/core"
+import { Controller, Get, Post, Put, Inject, Param, Query } from "@midwayjs/core"
 import { Context } from "@midwayjs/koa"
 import { ProjectService } from "../service/project.js"
 import type { ProjectCodeFile } from "../../shared/types.js"
@@ -21,13 +21,16 @@ export class ProjectController {
   }
 
   @Post("/create")
-  async create(@Body() body: { name: string; code?: ProjectCodeFile[] }) {
+  async create(ctx: Context) {
+    const body = ctx.request.body as { name: string; code?: ProjectCodeFile[] }
     if (!body.name) throw new Error("name is required")
     return this.projectService.create(body.name, body.code)
   }
 
   @Put("/update/:id")
-  async update(@Param() id: string, @Body() body: { name?: string; code?: ProjectCodeFile[] }) {
+  async update(ctx: Context) {
+    const id = ctx.params.id
+    const body = ctx.request.body as { name?: string; code?: ProjectCodeFile[] }
     return this.projectService.update(id, body)
   }
 }

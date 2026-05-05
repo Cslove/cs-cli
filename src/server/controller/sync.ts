@@ -1,6 +1,7 @@
 // 对标 opencode 的 SyncProvider bootstrap + session sync —— 数据同步控制器
 // 将多个并行请求合并为单次 HTTP 调用，减少 TUI 初始化时的网络开销
-import { Controller, Get, Put, Inject, Param, Body } from "@midwayjs/core"
+import { Controller, Get, Put, Inject, Param } from "@midwayjs/core"
+import { Context } from "@midwayjs/koa"
 import { ProviderService } from "../service/provider.js"
 import { AgentService } from "../service/agent.js"
 import { ConfigService } from "../service/config.js"
@@ -97,17 +98,17 @@ export class SyncController {
 
   /** 更新配置 */
   @Put("/config")
-  async updateConfig(@Body() body: { key: string; value: string | number | boolean }) {
+  async updateConfig(ctx: Context) {
+    const body = ctx.request.body as { key: string; value: string | number | boolean }
     this.configService.set(body.key, body.value)
     return { success: true }
   }
 
   /** 批量更新 session 的 todos */
   @Put("/todo/:sessionId")
-  async updateTodos(
-    @Param() sessionId: string,
-    @Body() body: { todos: Array<{ content: string; status: "pending" | "in_progress" | "completed" }> },
-  ) {
+  async updateTodos(ctx: Context) {
+    const sessionId = ctx.params.id
+    const body = ctx.request.body as { todos: Array<{ content: string; status: "pending" | "in_progress" | "completed" }> }
     const todos = await this.todoService.replaceAll(sessionId, body.todos)
     this.eventService.emit("todo.updated", { sessionID: sessionId, todos })
     return todos

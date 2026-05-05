@@ -1,5 +1,6 @@
 // 对标 opencode 的 server/routes/instance/session.ts 中的 prompt 路由 —— 聊天控制器
-import { Controller, Post, Inject, Body } from "@midwayjs/core"
+import { Controller, Post, Inject } from "@midwayjs/core"
+import { Context } from "@midwayjs/koa"
 import { SessionService } from "../service/session.js"
 import { LlmService } from "../service/llm.js"
 import { PartService } from "../service/part.js"
@@ -43,7 +44,8 @@ export class ChatController {
   eventService!: EventService
 
   @Post("/prompt")
-  async prompt(@Body() body: ChatPromptRequest) {
+  async prompt(ctx: Context) {
+    const body = ctx.request.body as ChatPromptRequest
     const session = await this.sessionService.getOrCreate(body.sessionId)
 
     // 对标 opencode：将 parts 数组转换为 LLM 可理解的 content 字符串
