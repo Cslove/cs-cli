@@ -12,6 +12,7 @@ import stringWidth from "string-width"
 import { useSession } from "../context/session.js"
 import { useRoute } from "../context/route.js"
 import { useToast } from "../context/toast.js"
+import { useDialog } from "../context/dialog.js"
 import { usePromptRef } from "../context/prompt-ref.js"
 import { usePromptHistory } from "../context/prompt-history.js"
 import { useSync } from "../context/sync.js"
@@ -93,6 +94,7 @@ export function PromptInput(props: PromptInputProps) {
   const { createSession, sendMessage } = useSession()
   const { navigate } = useRoute()
   const toast = useToast()
+  const dialog = useDialog()
   const promptRef = usePromptRef()
   const promptHistory = usePromptHistory()
   const sync = useSync()
@@ -311,6 +313,8 @@ export function PromptInput(props: PromptInputProps) {
   // ---- 键盘输入 ----
   useInput((ch, key) => {
     if (props.visible === false || props.disabled) return
+    // 对话框打开时（命令面板/会话列表等）跳过输入处理，避免按键穿透
+    if (!dialog.isEmpty) return
 
     // Autocomplete 键盘优先处理（对标 opencode 的 autocomplete.onKeyDown）
     if (autocomplete.visible) {
@@ -523,8 +527,8 @@ export function PromptInput(props: PromptInputProps) {
               <Text dimColor color="gray">ctrl+p  Commands</Text>
             </Box>
             <Box flexDirection="row" justifyContent="space-between">
+              <Text dimColor color="gray">ctrl+l  Sessions</Text>
               <Text dimColor color="gray">ctrl+m  Switch model</Text>
-              <Text dimColor color="gray">ctrl+q  Exit</Text>
             </Box>
           </Box>
         )}

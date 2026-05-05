@@ -117,7 +117,7 @@ function inkKeyName(key: Key, ch: string): string {
 
 const DEFAULT_KEYBINDS: KeybindDef[] = [
   { id: "app_exit", default: "ctrl+c", description: "Quit the application", category: "System" },
-  { id: "command_list", default: "escape", description: "Open command palette", category: "System" },
+  { id: "command_list", default: "ctrl+p", description: "Open command palette", category: "System" },
   { id: "session_new", default: "ctrl+n", description: "New session", category: "Session" },
   { id: "session_list", default: "ctrl+l", description: "Session list", category: "Session" },
   { id: "model_cycle", default: "ctrl+m", description: "Cycle model", category: "Model" },

@@ -19,6 +19,7 @@ import { KVProvider, useKV } from "./context/kv.js"
 import { ToastProvider, useToast, Toast } from "./context/toast.js"
 import { ChatView } from "./component/ChatView.js"
 import { HomeView } from "./component/HomeView.js"
+import { DialogSessionList } from "./component/DialogSessionList.js"
 
 interface AppProps {
   serverUrl: string
@@ -37,22 +38,22 @@ export function App(props: AppProps) {
               <SyncProvider>
                 <LocalProvider>
                   <KeybindProvider>
-                    <DialogProvider>
-                      <CommandProvider>
-                        <FrecencyProvider>
-                          <PromptHistoryProvider>
-                            <PromptRefProvider>
-                              <SessionProvider>
-                                <RouteProvider initialSessionId={props.sessionId}>
+                    <RouteProvider initialSessionId={props.sessionId}>
+                      <DialogProvider>
+                        <CommandProvider>
+                          <FrecencyProvider>
+                            <PromptHistoryProvider>
+                              <PromptRefProvider>
+                                <SessionProvider>
                                   <RawModeGuard />
                                   <AppContent model={props.model} />
-                                </RouteProvider>
-                              </SessionProvider>
-                            </PromptRefProvider>
-                          </PromptHistoryProvider>
-                        </FrecencyProvider>
-                      </CommandProvider>
-                    </DialogProvider>
+                                </SessionProvider>
+                              </PromptRefProvider>
+                            </PromptHistoryProvider>
+                          </FrecencyProvider>
+                        </CommandProvider>
+                      </DialogProvider>
+                    </RouteProvider>
                   </KeybindProvider>
                 </LocalProvider>
               </SyncProvider>
@@ -98,6 +99,16 @@ function AppContent({ model }: { model?: string }) {
 
   useEffect(() => {
     const unregister = command.register([
+      {
+        title: "Switch session",
+        value: "session.list",
+        keybind: "session_list",
+        category: "Session",
+        suggested: sync.data.session.length > 0,
+        onSelect: () => {
+          dialog.replace(<DialogSessionList />)
+        },
+      },
       {
         title: "New session",
         value: "session.new",
