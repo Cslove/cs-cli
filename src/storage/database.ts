@@ -144,6 +144,8 @@ function runMigrations() {
   try { db.run("ALTER TABLE session ADD COLUMN slug TEXT NOT NULL DEFAULT ''") } catch {}
   try { db.run("ALTER TABLE session ADD COLUMN version TEXT NOT NULL DEFAULT '0.0.0'") } catch {}
   try { db.run("ALTER TABLE session ADD COLUMN parent_id TEXT DEFAULT NULL") } catch {}
+  // 旧表列名 project_path → project_id，新表 CREATE TABLE 已用 project_id
+  try { db.run("ALTER TABLE session RENAME COLUMN project_path TO project_id") } catch {}
 
   saveDatabase()
 }
