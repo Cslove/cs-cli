@@ -42,8 +42,8 @@ function reducer(state: SessionState, action: SessionAction): SessionState {
 
 const SessionCtx = createContext<{
   state: SessionState
-  createSession: () => Promise<Session>
-  sendMessage: (content: string, agent?: string, parts?: PartInput[]) => Promise<void>
+  createSession: (input?: { title?: string; parentID?: string }) => Promise<Session>
+  sendMessage: (content: string, agent?: string, parts?: PartInput[], sessionId?: string) => Promise<void>
   loadSession: (id: string) => Promise<void>
   loadSessionList: () => Promise<void>
 } | null>(null)
@@ -77,23 +77,24 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     return () => unsubs.forEach((fn) => fn())
   }, [eventBus])
 
-  const createSession = useCallback(async () => {
-    const session = await api.session.create()
+  const createSession = useCallback(async (input?: { title?: string; parentID?: string }) => {
+    const session = await api.session.create(input)
     if (!session) throw new Error("Failed to create session")
     dispatch({ type: "SET_CURRENT", session })
     return session
   }, [api])
 
   const sendMessage = useCallback(
-    async (content: string, agent?: string, parts?: PartInput[]) => {
-      if (!state.current) return
+    async (content: string, agent?: string, parts?: PartInput[], sessionId?: string) => {
+      const sid = sessionId ?? state.current?.id
+      if (!sid) return
       dispatch({ type: "SET_LOADING", loading: true })
       dispatch({ type: "CLEAR_STREAM" })
 
       // 先将用户消息添加到本地
       const optimisticMsg: Message = {
         id: `temp-${Date.now()}`,
-        session_id: state.current.id,
+        session_id: sid,
         role: "user",
         content,
         model: "",
@@ -102,7 +103,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: "ADD_MESSAGE", message: optimisticMsg })
 
       try {
-        const result = await api.chat.prompt(state.current.id, content, undefined, agent, parts)
+        const result = await api.chat.prompt(sid, content, undefined, agent, parts)
         if (!result) dispatch({ type: "SET_LOADING", loading: false })
         // streaming 完成后由事件触发 ADD_MESSAGE 和 SET_LOADING
       } catch (e) {

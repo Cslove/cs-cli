@@ -84,6 +84,7 @@ export interface PromptInputProps {
   right?: React.ReactNode
   /** 底部提示行 */
   hint?: React.ReactNode
+  sessionID?: string
 }
 
 // ---- Component ----
@@ -247,10 +248,19 @@ export function PromptInput(props: PromptInputProps) {
     debug.log("Input: ", { input: trimmed, parts })
 
     try {
-      const session = await createSession()
-      navigate({ type: "session", sessionId: session.id })
-      // 创建 session 后发送带 parts 的消息
-      await sendMessage(inputText, agentName, parts)
+      let sessionID = props.sessionID
+      if (sessionID == null) {
+        const session = await createSession()
+        sessionID = session.id
+      }
+
+      await sendMessage(inputText, agentName, parts, sessionID)
+
+      if (!props.sessionID) {
+        setTimeout(() => {
+          navigate({ type: "session", sessionId: sessionID })
+        }, 50)
+      }
     } catch (e) {
       toast.error(e)
     } finally {

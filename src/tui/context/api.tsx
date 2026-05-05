@@ -16,7 +16,7 @@ interface ApiClient {
   session: {
     list: (projectPath?: string) => Promise<Session[] | null>
     get: (id: string) => Promise<Session | null>
-    create: () => Promise<Session | null>
+    create: (input?: { title?: string; parentID?: string }) => Promise<Session | null>
     remove: (id: string) => Promise<void | null>
   }
   chat: {
@@ -163,7 +163,10 @@ function createApiClient(baseUrl: string, onError: (msg: string) => void): ApiCl
       list: (projectPath) =>
         request<Session[]>(`/api/session${projectPath ? `?projectPath=${encodeURIComponent(projectPath)}` : ""}`),
       get: (id) => request<Session>(`/api/session/${id}`),
-      create: () => request<Session>("/api/session", { method: "POST" }),
+      create: (input) => request<Session>("/api/session", {
+        method: "POST",
+        body: JSON.stringify(input ?? {}),
+      }),
       remove: (id) => request<void>(`/api/session/${id}`, { method: "DELETE" }),
     },
     chat: {

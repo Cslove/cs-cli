@@ -5,6 +5,33 @@ import { getDb, scheduleSave } from "../../storage/database.js"
 import type { SessionEntity } from "../entity/session.js"
 import type { MessageEntity } from "../entity/message.js"
 
+// 降序 ID：用 (MAX_TIMESTAMP - now) 作为前缀，使最新 session 的 ID 字符串最大
+// list 查询时 ORDER BY id DESC 即按创建时间从新到旧排列
+const MAX_TIMESTAMP = 9999999999999 // 13位时间戳上限
+
+function createSessionID(): string {
+  const now = Date.now()
+  const prefix = (MAX_TIMESTAMP - now).toString().padStart(13, "0")
+  const suffix = Math.random().toString(36).slice(2, 8)
+  return `${prefix}-${suffix}`
+}
+
+// 生成 URL 友好的短标识（3组随机字母数字）
+function createSlug(): string {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+  const pick = () => Array.from({ length: 3 }, () => chars[Math.floor(Math.random() * chars.length)]).join("")
+  return `${pick()}-${pick()}-${pick()}`
+}
+
+export interface SessionCreateInput {
+  title?: string
+  parentID?: string
+}
+
+function createDefaultTitle(isSubSession: boolean): string {
+  return isSubSession ? "Sub-session" : "New Session"
+}
+
 @Provide()
 @Scope(ScopeEnum.Singleton)
 export class SessionService {
@@ -17,7 +44,7 @@ export class SessionService {
   async list(projectPath?: string): Promise<SessionEntity[]> {
     const db = getDb()
     if (projectPath) {
-      const stmt = db.prepare("SELECT * FROM session WHERE project_id = ? ORDER BY updated_at DESC")
+      const stmt = db.prepare("SELECT * FROM session WHERE project_id = ? ORDER BY id DESC")
       stmt.bind([projectPath])
       const results: SessionEntity[] = []
       while (stmt.step()) {
@@ -26,7 +53,7 @@ export class SessionService {
       stmt.free()
       return results
     }
-    const stmt = db.prepare("SELECT * FROM session ORDER BY updated_at DESC")
+    const stmt = db.prepare("SELECT * FROM session ORDER BY id DESC")
     const results: SessionEntity[] = []
     while (stmt.step()) {
       results.push(stmt.getAsObject() as unknown as SessionEntity)
@@ -53,21 +80,25 @@ export class SessionService {
     return this.create()
   }
 
-  async create(title?: string): Promise<SessionEntity> {
+  async create(input?: SessionCreateInput): Promise<SessionEntity> {
     const now = Date.now()
+    const isSubSession = !!input?.parentID
     const session: SessionEntity = {
-      id: uuid(),
-      title: title ?? "New Session",
+      id: createSessionID(),                                              // 对标 opencode SessionID.descending()
+      slug: createSlug(),                                                 // 对标 opencode Slug.create()
+      version: process.env.npm_package_version ?? "0.0.0",               // 对标 opencode InstallationVersion
+      title: input?.title ?? createDefaultTitle(isSubSession),           // 对标 opencode createDefaultTitle()
       model: process.env.CS_MODEL ?? "gpt-4o",
       project_id: process.env.CS_PROJECT ?? "",
+      parent_id: input?.parentID ?? null,                                 // 对标 opencode input.parentID
       created_at: now,
       updated_at: now,
     }
 
     const db = getDb()
     db.run(
-      "INSERT INTO session (id, title, model, project_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [session.id, session.title, session.model, session.project_id, session.created_at, session.updated_at],
+      "INSERT INTO session (id, slug, version, title, model, project_id, parent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [session.id, session.slug, session.version, session.title, session.model, session.project_id, session.parent_id, session.created_at, session.updated_at],
     )
     scheduleSave()
 

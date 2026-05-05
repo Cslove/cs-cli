@@ -62,9 +62,12 @@ function runMigrations() {
   db.run(`
     CREATE TABLE IF NOT EXISTS session (
       id TEXT PRIMARY KEY,
+      slug TEXT NOT NULL DEFAULT '',
+      version TEXT NOT NULL DEFAULT '0.0.0',
       title TEXT NOT NULL DEFAULT '',
       model TEXT NOT NULL DEFAULT '',
       project_id TEXT NOT NULL DEFAULT '',
+      parent_id TEXT DEFAULT NULL,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -118,6 +121,15 @@ function runMigrations() {
   db.run(`
     CREATE INDEX IF NOT EXISTS idx_part_message ON part(message_id);
   `)
+
+  // 对标 opencode：新增 slug, version, parent_id 列迁移
+  // ALTER TABLE ADD COLUMN 对已存在的表是安全的（不会影响已有数据）
+  try { db.run("ALTER TABLE session ADD COLUMN slug TEXT NOT NULL DEFAULT ''") } catch {}
+  try { db.run("ALTER TABLE session ADD COLUMN version TEXT NOT NULL DEFAULT '0.0.0'") } catch {}
+  try { db.run("ALTER TABLE session ADD COLUMN parent_id TEXT DEFAULT NULL") } catch {}
+
+  // part 表扩展：支持 file/agent 类型（对标 opencode PartInput）
+  try { db.run("ALTER TABLE part DROP CONSTRAINT IF EXISTS type") } catch {}
 
   db.run(`
     CREATE TABLE IF NOT EXISTS todo (

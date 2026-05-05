@@ -1,7 +1,7 @@
 // 对标 opencode 的 server/routes/instance/session.ts —— 会话控制器
-import { Controller, Get, Post, Inject, Del, Param } from "@midwayjs/core"
+import { Controller, Get, Post, Inject, Del, Param, Body } from "@midwayjs/core"
 import { Context } from "@midwayjs/koa"
-import { SessionService } from "../service/session.js"
+import { SessionService, type SessionCreateInput } from "../service/session.js"
 import { EventService } from "../service/event.js"
 
 @Controller("/api/session")
@@ -26,8 +26,9 @@ export class SessionController {
   }
 
   @Post("/")
-  async create() {
-    const session = await this.sessionService.create()
+  async create(@Body() body?: SessionCreateInput) {
+    const session = await this.sessionService.create(body)
+    this.eventService.emit("session.created", session)
     this.eventService.emit("session.updated", session)
     return session
   }

@@ -348,16 +348,19 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
     // session.updated → upsert
     unsubscribers.push(event.on("session.updated", (data) => {
-      const d = data as { id: string; title?: string; model?: string }
+      const d = data as { id: string; slug?: string; version?: string; title?: string; model?: string; parent_id?: string; project_id?: string; created_at?: number }
       const existing = stateRef.current.session.find((s) => s.id === d.id)
       dispatch({
         type: "SESSION_UPSERT",
         session: {
           id: d.id,
+          slug: d.slug ?? existing?.slug ?? "",
+          version: d.version ?? existing?.version ?? "0.0.0",
           title: d.title ?? existing?.title ?? "",
           model: d.model ?? existing?.model ?? "",
-          project_id: existing?.project_id ?? "",
-          created_at: existing?.created_at ?? Date.now(),
+          project_id: d.project_id ?? existing?.project_id ?? "",
+          parent_id: d.parent_id ?? existing?.parent_id ?? null,
+          created_at: d.created_at ?? existing?.created_at ?? Date.now(),
           updated_at: Date.now(),
         },
       })
