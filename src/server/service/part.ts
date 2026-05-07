@@ -57,6 +57,40 @@ export class PartService {
     scheduleSave()
   }
 
+  /**
+   * 对标 opencode sessions.updatePart 的属性更新能力（占位实现）
+   * 当前仅支持 text/tool_name/tool_input/tool_output 四个字段，后续随 tool/finish 元数据扩展
+   */
+  async updateAttrs(id: string, attrs: {
+    text?: string
+    tool_name?: string
+    tool_input?: string
+    tool_output?: string
+  }): Promise<void> {
+    const sets: string[] = []
+    const values: Array<string | number> = []
+    if (attrs.text !== undefined) { sets.push("text = ?"); values.push(attrs.text) }
+    if (attrs.tool_name !== undefined) { sets.push("tool_name = ?"); values.push(attrs.tool_name) }
+    if (attrs.tool_input !== undefined) { sets.push("tool_input = ?"); values.push(attrs.tool_input) }
+    if (attrs.tool_output !== undefined) { sets.push("tool_output = ?"); values.push(attrs.tool_output) }
+    if (sets.length === 0) return
+    const db = getDb()
+    db.run(`UPDATE part SET ${sets.join(", ")} WHERE id = ?`, [...values, id])
+    scheduleSave()
+  }
+
+  async get(id: string): Promise<PartEntity | undefined> {
+    const db = getDb()
+    const stmt = db.prepare("SELECT * FROM part WHERE id = ?")
+    stmt.bind([id])
+    let result: PartEntity | undefined
+    if (stmt.step()) {
+      result = stmt.getAsObject() as unknown as PartEntity
+    }
+    stmt.free()
+    return result
+  }
+
   /** 对标 opencode 的 message.part.delta —— 追加文本增量 */
   async appendText(id: string, delta: string): Promise<void> {
     const db = getDb()

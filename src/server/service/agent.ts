@@ -14,7 +14,13 @@ export class AgentService {
     return this.agents
   }
 
-  get(id: string): Agent | undefined {
-    return this.agents.find((a) => a.id === id)
+  get(idOrName: string): Agent | undefined {
+    // 对标 opencode agents.get(name)：同时支持按 id 和 name 查找
+    return this.agents.find((a) => a.id === idOrName || a.name === idOrName)
+  }
+
+  /** 对标 opencode agents.defaultAgent() —— 返回默认 agent 名称 */
+  defaultAgent(): string {
+    return this.agents[0]?.name ?? "Code"
   }
 }

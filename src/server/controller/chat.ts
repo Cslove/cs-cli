@@ -1,143 +1,66 @@
 // 对标 opencode 的 server/routes/instance/session.ts 中的 prompt 路由 —— 聊天控制器
+// 本 controller 仅做参数校验 + 转发，全部业务逻辑放在 SessionPromptService
 import { Controller, Post, Inject } from "@midwayjs/core"
 import { Context } from "@midwayjs/koa"
-import { SessionService } from "../service/session.js"
-import { LlmService } from "../service/llm.js"
-import { PartService } from "../service/part.js"
+import { SessionPromptService } from "../service/session/prompt.js"
 import { EventService } from "../service/event.js"
-import type { ChatPromptRequest, PartInput } from "../../shared/types.js"
-
-// 对标 opencode submit()：将 parts 数组转换为 LLM 可理解的 content 字符串
-// text parts → 文本内容
-// agent parts → "[Agent: {name}]" 标记
-// file parts → "[File: {path}]" 标记
-function buildContentFromParts(fallbackContent: string, parts?: PartInput[]): string {
-  if (!parts?.length) return fallbackContent
-
-  const fragments: string[] = []
-  for (const part of parts) {
-    if (part.type === "text") {
-      fragments.push(part.text)
-    } else if (part.type === "agent") {
-      fragments.push(`[Agent: ${part.name}]`)
-    } else if (part.type === "file") {
-      const path = part.source?.path ?? part.filename ?? ""
-      fragments.push(`[File: ${path}]`)
-    }
-  }
-
-  return fragments.join("\n") || fallbackContent
-}
+import type { ChatPromptRequest, ChatPromptResponse } from "../../shared/types.js"
+import type { PromptInput } from "../../shared/prompt.js"
 
 @Controller("/api/chat")
 export class ChatController {
   @Inject()
-  sessionService!: SessionService
-
-  @Inject()
-  llmService!: LlmService
-
-  @Inject()
-  partService!: PartService
+  promptService!: SessionPromptService
 
   @Inject()
   eventService!: EventService
 
   @Post("/prompt")
-  async prompt(ctx: Context) {
+  async prompt(ctx: Context): Promise<ChatPromptResponse> {
     const body = ctx.request.body as ChatPromptRequest
-    const session = await this.sessionService.getOrCreate(body.sessionId)
+    if (!body?.sessionId) throw new Error("sessionId is required")
 
-    // 对标 opencode：将 parts 数组转换为 LLM 可理解的 content 字符串
-    const content = buildContentFromParts(body.content, body.parts)
+    const parts = body.parts && body.parts.length > 0
+      ? body.parts
+      : [{ type: "text" as const, text: body.content ?? "" }]
 
-    // 保存用户消息
-    const userMessage = await this.sessionService.addMessage({
-      sessionId: session.id,
-      role: "user",
-      content,
-    })
-    this.eventService.emit("message.created", userMessage)
-
-    // 存储用户提交的 parts（对标 opencode message.parts）
-    if (body.parts?.length) {
-      for (const part of body.parts) {
-        await this.partService.create({
-          messageId: userMessage.id,
-          type: part.type,
-          text: part.type === "text" ? part.text
-            : part.type === "agent" ? part.name
-            : part.type === "file" ? (part.filename ?? part.source?.path ?? "")
-            : "",
-        })
-      }
+    const input: PromptInput = {
+      sessionID: body.sessionId,
+      ...(body.agent !== undefined && { agent: body.agent }),
+      ...(body.model !== undefined && {
+        model: parseModelString(body.model),
+      }),
+      parts,
     }
 
-    // 对标 opencode：prompt 开始时标记 session 为 working
-    this.eventService.emit("session.status", { sessionID: session.id, status: "working" })
-    this.eventService.emit("session.updated", session)
-
-    // 对标 opencode：先创建空的 assistant message + text part，流式时用 part.delta 追加
-    const assistantMessage = await this.sessionService.addMessage({
-      sessionId: session.id,
-      role: "assistant",
-      content: "",
-      model: body.model,
-    })
-    this.eventService.emit("message.created", assistantMessage)
-
-    const textPart = await this.partService.create({
-      messageId: assistantMessage.id,
-      type: "text",
-    })
-    this.eventService.emit("message.part.updated", {
-      ...textPart,
-      messageID: assistantMessage.id,
+    // 触发 prompt：异步执行，立即返回 streaming: true
+    // 真正的 message/part/status 事件通过 SSE (/global/event) 推送到 TUI
+    void this.promptService.prompt(input).catch((err: unknown) => {
+      // 兜底：如果异常发生在 SessionPromptService 内 try 块之外（例如 getOrCreate / resolveModel 抛错），
+      // 该路径不会自己 emit session.error，所以这里再发一次确保 TUI 能感知
+      const message = err instanceof Error ? err.message : String(err)
+      this.eventService.emit("session.error", { sessionID: body.sessionId, error: message })
     })
 
-    // 异步调用 LLM（流式推送 token）
-    const messages = await this.sessionService.getChatMessages(session.id)
-    this.llmService
-      .chat({
-        sessionId: session.id,
-        messages: messages.filter((m) => m.role !== "assistant" || m !== assistantMessage),
-        model: body.model,
-        onToken: (token) => {
-          // 对标 opencode 的 message.part.delta
-          this.eventService.emit("message.part.delta", {
-            messageID: assistantMessage.id,
-            partID: textPart.id,
-            field: "text",
-            delta: token,
-          })
-        },
-        onComplete: async (fullContent) => {
-          // 更新 assistant message 和 part
-          await this.sessionService.addMessage({
-            sessionId: session.id,
-            role: "assistant",
-            content: fullContent,
-            model: body.model,
-          })
-          this.eventService.emit("message.updated", { ...assistantMessage, content: fullContent })
-          this.eventService.emit("message.part.updated", {
-            ...textPart,
-            messageID: assistantMessage.id,
-            text: fullContent,
-          })
-          // 对标 opencode：prompt 完成时标记 session 为 idle
-          this.eventService.emit("session.status", { sessionID: session.id, status: "idle" })
-          this.eventService.emit("session.updated", session)
-        },
-      })
-      .catch((e) => {
-        this.eventService.emit("session.error", {
-          sessionId: session.id,
-          error: e instanceof Error ? e.message : String(e),
-        })
-        this.eventService.emit("session.status", { sessionID: session.id, status: "idle" })
-      })
+    return { sessionId: body.sessionId, streaming: true }
+  }
 
-    return { sessionId: session.id, streaming: true }
+  @Post("/cancel")
+  async cancel(ctx: Context): Promise<{ sessionId: string; cancelled: boolean }> {
+    const body = ctx.request.body as { sessionId?: string }
+    if (!body?.sessionId) throw new Error("sessionId is required")
+    this.promptService.cancel(body.sessionId)
+    return { sessionId: body.sessionId, cancelled: true }
   }
 }
+
+/**
+ * 把老的 model 字符串（"gpt-4o" 或 "openai/gpt-4o"）解析为 { providerID, modelID }
+ * 缺省 providerID 留空，由 SessionPromptService.resolveModel 用默认 provider 兜底
+ */
+function parseModelString(model: string): { providerID: string; modelID: string } {
+  const slashIdx = model.indexOf("/")
+  if (slashIdx < 0) return { providerID: "", modelID: model }
+  return { providerID: model.slice(0, slashIdx), modelID: model.slice(slashIdx + 1) }
+}
+
