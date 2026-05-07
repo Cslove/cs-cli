@@ -9,7 +9,7 @@ import type { PromptInput } from "../../shared/prompt.js"
 
 @Controller("/api/chat")
 export class ChatController {
-  @Inject()
+  @Inject("sessionPromptService")
   promptService!: SessionPromptService
 
   @Inject()

@@ -2,7 +2,7 @@
 import { initializeGlobalApplicationContext, MidwayApplicationManager } from "@midwayjs/core"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { readdir } from "node:fs/promises"
+import { readdir, stat } from "node:fs/promises"
 import { createConnection } from "node:net"
 import { ContainerConfiguration } from "./configuration.js"
 
@@ -22,15 +22,23 @@ function isPortAvailable(port: number): Promise<boolean> {
 async function loadModules() {
   const ext = import.meta.url.endsWith(".ts") ? ".ts" : ".js"
   const modules: any[] = []
-  for (const dir of ["controller", "service", "entity"]) {
-    const absDir = join(__dirname, dir)
-    let files: string[]
-    try { files = await readdir(absDir) } catch { continue }
-    for (const file of files) {
-      if (file.endsWith(ext)) {
-        modules.push(await import(join(absDir, file)))
+
+  async function scanDir(absDir: string) {
+    let entries: string[]
+    try { entries = await readdir(absDir) } catch { return }
+    for (const entry of entries) {
+      const full = join(absDir, entry)
+      const s = await stat(full)
+      if (s.isDirectory()) {
+        await scanDir(full)
+      } else if (entry.endsWith(ext)) {
+        modules.push(await import(full))
       }
     }
+  }
+
+  for (const dir of ["controller", "service", "entity"]) {
+    await scanDir(join(__dirname, dir))
   }
   return modules
 }

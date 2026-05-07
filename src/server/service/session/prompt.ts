@@ -44,19 +44,19 @@ export class SessionPromptService {
   @Inject()
   llmService!: LlmService
 
-  @Inject()
+  @Inject("sessionProcessorService")
   processor!: SessionProcessorService
 
-  @Inject()
+  @Inject("sessionRunStateService")
   runState!: SessionRunStateService
 
-  @Inject()
+  @Inject("sessionStatusService")
   status!: SessionStatusService
 
-  @Inject()
+  @Inject("systemPromptService")
   systemPrompt!: SystemPromptService
 
-  @Inject()
+  @Inject("toolRegistryService")
   toolRegistry!: ToolRegistryService
 
   @Inject()
