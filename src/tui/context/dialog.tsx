@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useReducer, useCallback, useRef } from "react"
 import { Box, Text, useInput } from "ink"
 import { useTerminalSize } from "../hook/useTerminalSize.js"
+import { theme } from "./theme.js"
 
 // ---- State ----
 
@@ -160,7 +161,7 @@ function DialogOverlay({ children, size }: { children: React.ReactNode; size: Di
       <Box
         flexDirection="column"
         width={width}
-        backgroundColor="black"
+        backgroundColor={theme.backgroundPanel}
         paddingX={2}
         paddingY={1}
       >
@@ -194,11 +195,11 @@ export function DialogItem({
   onSelect?: () => void
 }) {
    return (
-    <Box flexDirection="row" gap={1} backgroundColor={selected ? "gray" : undefined} paddingX={1}>
-      <Text color={selected ? "cyan" : "gray"}>{selected ? "▸" : " "} </Text>
-      <Text bold={selected} color={selected ? "white" : undefined}>{label}</Text>
-      {description && <Text dimColor={!selected} color={selected ? "gray" : undefined}> {description}</Text>}
-      {keybind && <Text dimColor color="gray"> [{keybind}]</Text>}
+    <Box flexDirection="row" gap={1} backgroundColor={selected ? theme.backgroundElement : undefined} paddingX={1}>
+      <Text color={selected ? theme.accent : theme.textMuted}>{selected ? "▸" : " "} </Text>
+      <Text bold={selected} color={selected ? theme.text : undefined}>{label}</Text>
+      {description && <Text dimColor={!selected} color={selected ? theme.textMuted : undefined}> {description}</Text>}
+      {keybind && <Text dimColor color={theme.textMuted}> [{keybind}]</Text>}
     </Box>
   )
 }
@@ -206,7 +207,7 @@ export function DialogItem({
 export function DialogFooter({ children }: { children?: React.ReactNode }) {
   return (
     <Box marginTop={1} flexDirection="row" gap={1}>
-      <Text dimColor color="gray">Esc to close</Text>
+      <Text dimColor color={theme.textMuted}>Esc to close</Text>
       {children}
     </Box>
   )

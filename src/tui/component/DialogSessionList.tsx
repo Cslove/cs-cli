@@ -8,6 +8,7 @@ import { useRoute } from "../context/route.js"
 import { useKeybind } from "../context/keybind.js"
 import { useApi } from "../context/api.js"
 import { useToast } from "../context/toast.js"
+import { theme } from "../context/theme.js"
 
 type Mode = "select" | "rename"
 
@@ -140,18 +141,18 @@ export function DialogSessionList() {
       {/* filter 始终显示 */}
       <Box marginBottom={1}>
         <Text dimColor>Filter: </Text>
-        <Text color={filter ? "cyan" : "gray"}>{filter || "type to search..."}</Text>
+        <Text color={filter ? theme.accent : theme.textMuted}>{filter || "type to search..."}</Text>
       </Box>
       {mode === "rename" && current && (
         <Box marginBottom={1}>
-          <Text color="yellow">Rename: </Text>
-          <Text color="white">{renameText}</Text>
-          <Text backgroundColor="white">{" "}</Text>
+          <Text color={theme.warning}>Rename: </Text>
+          <Text color={theme.text}>{renameText}</Text>
+          <Text backgroundColor={theme.text}>{" "}</Text>
         </Box>
       )}
       {Array.from(categories.entries()).map(([category, items]) => (
         <Box key={category} flexDirection="column" marginBottom={1}>
-          <Text bold color="gray">{category}</Text>
+          <Text bold color={theme.textMuted}>{category}</Text>
           {items.map((session) => {
             const globalIdx = sessions.indexOf(session)
             const isCurrent = session.id === currentSessionId
@@ -177,9 +178,9 @@ export function DialogSessionList() {
         <Text dimColor>No sessions found</Text>
       )}
       <Box marginTop={1} flexDirection="row" gap={2}>
-        <Text dimColor color="gray">{keybind.print("session_delete")} delete</Text>
-        <Text dimColor color="gray">{keybind.print("session_rename")} rename</Text>
-        <Text dimColor color="gray">↑↓ navigate</Text>
+        <Text dimColor color={theme.textMuted}>{keybind.print("session_delete")} delete</Text>
+        <Text dimColor color={theme.textMuted}>{keybind.print("session_rename")} rename</Text>
+        <Text dimColor color={theme.textMuted}>↑↓ navigate</Text>
       </Box>
     </Box>
   )

@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useCallback } from "react"
 import { Box, Text, useInput } from "ink"
 import { useDialog, DialogTitle, DialogItem, DialogFooter } from "./dialog.js"
 import { useKeybind } from "./keybind.js"
+import { theme } from "./theme.js"
 
 // ---- Types ----
 
@@ -220,12 +221,12 @@ function CommandPanel({
       {filter && (
         <Box marginBottom={1}>
           <Text dimColor>Filter: </Text>
-          <Text color="cyan">{filter}</Text>
+          <Text color={theme.accent}>{filter}</Text>
         </Box>
       )}
       {Array.from(categories.entries()).map(([category, items]) => (
         <Box key={category} flexDirection="column" marginBottom={1}>
-          <Text bold color="gray">{category}</Text>
+          <Text bold color={theme.textMuted}>{category}</Text>
           {items.map((option) => {
             const globalIdx = flatItems.indexOf(option)
             return (
@@ -244,7 +245,7 @@ function CommandPanel({
         <Text dimColor>No matching commands</Text>
       )}
       <DialogFooter>
-        <Text dimColor color="gray"> | ↑↓ Navigate | Enter: Select | Type to filter</Text>
+        <Text dimColor color={theme.textMuted}> | ↑↓ Navigate | Enter: Select | Type to filter</Text>
       </DialogFooter>
     </Box>
   )

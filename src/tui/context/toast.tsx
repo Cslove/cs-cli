@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useCallback, useRef, useMem
 import { Box, Text } from "ink"
 import type { BoxStyle } from "cli-boxes"
 import { useTerminalSize } from "../hook/useTerminalSize.js"
+import { theme } from "./theme.js"
 
 // 对标 opencode 的 SplitBorder.customBorderChars
 // 只显示左右竖线 ┃，其他边为空
@@ -35,10 +36,10 @@ interface ToastContext {
 const ctx = createContext<ToastContext | null>(null)
 
 const VARIANT_COLORS: Record<ToastVariant, string> = {
-  info: "cyan",
-  success: "green",
-  warning: "yellow",
-  error: "red",
+  info: theme.info,
+  success: theme.success,
+  warning: theme.warning,
+  error: theme.error,
 }
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
@@ -108,7 +109,7 @@ export function Toast() {
       paddingRight={2}
       paddingTop={1}
       paddingBottom={1}
-      backgroundColor="black"
+      backgroundColor={theme.backgroundPanel}
     >
       {currentToast.title && (
         <Box marginBottom={1}>

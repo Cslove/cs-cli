@@ -4,6 +4,7 @@ import React from "react"
 import { Box, Text } from "ink"
 import { useTerminalSize } from "../hook/useTerminalSize.js"
 import { PromptInput } from "./PromptInput.js"
+import { theme } from "../context/theme.js"
 
 // ---- ASCII Art Logo ----
 const SI_LINES = [
@@ -55,9 +56,9 @@ export function HomeView() {
         <Box flexDirection="column" flexShrink={0}>
           {SI_LINES.map((line, i) => (
             <Box key={i} flexDirection="row">
-              <Text color="magenta" bold>{line}</Text>
+              <Text color={theme.secondary} bold>{line}</Text>
               <Text>{LOGO_SPACER}</Text>
-              <Text color="cyan" bold>{RONG_LINES[i]}</Text>
+              <Text color={theme.accent} bold>{RONG_LINES[i]}</Text>
             </Box>
           ))}
         </Box>

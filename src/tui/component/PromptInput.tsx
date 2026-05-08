@@ -10,6 +10,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { Box, Text, useInput, usePaste, useApp } from "ink"
 import stringWidth from "string-width"
 import { useSession } from "../context/session.js"
+import { theme } from "../context/theme.js"
 import { useRoute } from "../context/route.js"
 import { useToast } from "../context/toast.js"
 import { useDialog } from "../context/dialog.js"
@@ -412,7 +413,7 @@ export function PromptInput(props: PromptInputProps) {
 
   const placeholderText = `Ask anything... "${PLACEHOLDERS[placeholderIndex.current % PLACEHOLDERS.length]}"`
 
-  const borderColor = "magenta"
+  const borderColor = theme.secondary
 
   // useMemo 缓存渲染计算，避免每次渲染重复 stringWidth
   const { before, cursorChar, after, cursorBlockWidth } = useMemo(() => {
@@ -429,9 +430,9 @@ export function PromptInput(props: PromptInputProps) {
 
   debug.log("PromptInput", { input, cursor })
 
-  // 判断光标所在 segment 的颜色（用于 cursorChar 的反色）
+  // 判断光标所在 segment 的颜色（用于 cursorChar 的背景色）
   const cursorSegment = segments.find((s: RenderSegment) => cursor >= s.start && cursor < s.end)
-  const cursorBgColor = cursorSegment?.type === "agent" ? "cyan" : cursorSegment?.type === "file" ? "blue" : undefined
+  const cursorBgColor = cursorSegment?.type === "agent" ? theme.accent : cursorSegment?.type === "file" ? theme.primary : theme.primary
 
   return (
     <Box flexDirection="column" width="100%">
@@ -449,7 +450,7 @@ export function PromptInput(props: PromptInputProps) {
         borderBottom={false}
         borderLeft={true}
         borderLeftColor={borderColor}
-        backgroundColor="gray"
+        backgroundColor={theme.backgroundElement}
         paddingLeft={1}
         paddingRight={1}
         paddingTop={1}
@@ -465,47 +466,47 @@ export function PromptInput(props: PromptInputProps) {
                   const segBefore = seg.text.slice(0, cursor - seg.start)
                   const segCursor = seg.text[cursor - seg.start]
                   const segAfter = seg.text.slice(cursor - seg.start + 1)
-                  const color = seg.type === "agent" ? "black" : seg.type === "file" ? "white" : "white"
-                  const bg = seg.type === "agent" ? "cyan" : seg.type === "file" ? "blue" : undefined
+                  const color = seg.type === "agent" ? theme.background : seg.type === "file" ? theme.text : theme.text
+                  const bg = seg.type === "agent" ? theme.accent : seg.type === "file" ? theme.primary : undefined
                   return <React.Fragment key={i}>
                     {segBefore && <Text color={color} backgroundColor={bg}>{segBefore}</Text>}
                     {segCursor ? (
-                      <Text color="white" backgroundColor={cursorBgColor ?? borderColor}>{segCursor}</Text>
+                      <Text color={theme.text} backgroundColor={cursorBgColor ?? borderColor}>{segCursor}</Text>
                     ) : (
-                      <Text backgroundColor="white">{" "}</Text>
+                      <Text backgroundColor={theme.text}>{" "}</Text>
                     )}
                     {segAfter && <Text color={color} backgroundColor={bg}>{segAfter}</Text>}
                   </React.Fragment>
                 }
                 // 光标不在这个 segment 内
                 if (seg.type === "agent") {
-                  return <Text key={i} color="black" backgroundColor="cyan">{seg.text}</Text>
+                  return <Text key={i} color={theme.background} backgroundColor={theme.accent}>{seg.text}</Text>
                 }
                 if (seg.type === "file") {
-                  return <Text key={i} color="white" backgroundColor="blue">{seg.text}</Text>
+                  return <Text key={i} color={theme.text} backgroundColor={theme.primary}>{seg.text}</Text>
                 }
-                return <Text key={i} color="white">{seg.text}</Text>
+                return <Text key={i} color={theme.text}>{seg.text}</Text>
               })}
               {/* 光标在末尾（无 segment 覆盖） */}
               {cursor === input.length && !cursorChar && (
-                <Text backgroundColor="white">{" "}</Text>
+                <Text backgroundColor={theme.text}>{" "}</Text>
               )}
             </Text>
           ) : (
             <Text>
-              <Text backgroundColor="white">{" "}</Text>
-              <Text dimColor color="gray">{placeholderText}</Text>
+              <Text backgroundColor={theme.text}>{" "}</Text>
+              <Text dimColor color={theme.textMuted}>{placeholderText}</Text>
             </Text>
           )}
           {/* agent/model 信息：输入框内部左下角 */}
           <Box flexDirection="row" gap={1} paddingTop={1}>
-            <Text color="magenta">{agentName}</Text>
-            <Text dimColor color="gray">·</Text>
-            <Text dimColor color="gray">{modelName}</Text>
+            <Text color={theme.secondary}>{agentName}</Text>
+            <Text dimColor color={theme.textMuted}>·</Text>
+            <Text dimColor color={theme.textMuted}>{modelName}</Text>
             {/* 右侧额外内容 */}
             {props.right && (
               <>
-                <Text dimColor color="gray">·</Text>
+                <Text dimColor color={theme.textMuted}>·</Text>
                 {props.right}
               </>
             )}
@@ -523,12 +524,12 @@ export function PromptInput(props: PromptInputProps) {
         {props.hint ?? (
           <Box flexDirection="column" gap={1} width="100%">
             <Box flexDirection="row" justifyContent="space-between">
-              <Text dimColor color="gray">ctrl+n  New session</Text>
-              <Text dimColor color="gray">ctrl+p  Commands</Text>
+              <Text dimColor color={theme.textMuted}>ctrl+n  New session</Text>
+              <Text dimColor color={theme.textMuted}>ctrl+p  Commands</Text>
             </Box>
             <Box flexDirection="row" justifyContent="space-between">
-              <Text dimColor color="gray">ctrl+l  Sessions</Text>
-              <Text dimColor color="gray">ctrl+m  Switch model</Text>
+              <Text dimColor color={theme.textMuted}>ctrl+l  Sessions</Text>
+              <Text dimColor color={theme.textMuted}>ctrl+m  Switch model</Text>
             </Box>
           </Box>
         )}
