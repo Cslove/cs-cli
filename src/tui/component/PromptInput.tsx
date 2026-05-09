@@ -4,11 +4,10 @@
 // 性能优化策略：
 // 1. useRef 存储真实输入状态，不触发渲染
 // 2. 单一 display state 对象，合并 3 个 setState 为 1 个
-// 3. 32ms 合并窗口（~30fps），避免快速打字/长按删除时卡顿
+// 3. React 18 自动批处理合并同一事件循环内的 setState，无需手动合并窗口
 // 4. useMemo 缓存渲染计算（stringWidth 等）
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
-import { Box, Text, useInput, usePaste, useApp } from "ink"
-import stringWidth from "string-width"
+import { Box, Text, useInput, usePaste, useApp, useCursor } from "ink"
 import { useSession } from "../context/session.js"
 import { theme } from "../context/theme.js"
 import { useRoute } from "../context/route.js"
@@ -73,6 +72,49 @@ function buildSegments(input: string, mentions: MentionSpan[]): RenderSegment[] 
   return segments
 }
 
+// ---- 内联视觉光标渲染 ----
+// 仿 ink-text-input 方案：将光标作为反色字符渲染在文本内部
+// 彻底消除 yoga 坐标换算导致的定位偏差问题
+// 光标随文本一起渲染 → 位置永远正确、换行自然跟随、无坐标计算开销
+
+function renderSegmentsWithCursor(
+  segments: RenderSegment[],
+  input: string,
+  cursor: number,
+): React.ReactNode[] {
+  const elements: React.ReactNode[] = []
+  let keyIdx = 0
+
+  const segProps = (type: string) =>
+    type === "agent" ? { color: theme.background, backgroundColor: theme.accent }
+    : type === "file" ? { color: theme.text, backgroundColor: theme.primary }
+    : { color: theme.text }
+
+  for (const seg of segments) {
+    if (cursor >= seg.start && cursor < seg.end) {
+      // 光标在本段内，拆分为 [前部] + [光标字符(反色)] + [后部]
+      const local = cursor - seg.start
+      const before = seg.text.slice(0, local)
+      const ch = seg.text[local] ?? " "
+      const after = seg.text.slice(local + 1)
+      const style = segProps(seg.type)
+      if (before) elements.push(<Text key={keyIdx++} {...style}>{before}</Text>)
+      elements.push(<Text key={keyIdx++} color={theme.background} backgroundColor={theme.text}>{ch}</Text>)
+      if (after) elements.push(<Text key={keyIdx++} {...style}>{after}</Text>)
+    } else {
+      // 光标不在本段，原样渲染
+      elements.push(<Text key={keyIdx++} {...segProps(seg.type)}>{seg.text}</Text>)
+    }
+  }
+
+  // 光标在输入末尾（追加位置）——渲染一个反色空格
+  if (cursor === input.length) {
+    elements.push(<Text key={keyIdx++} color={theme.background} backgroundColor={theme.text}>{" "}</Text>)
+  }
+
+  return elements
+}
+
 // ---- Props ----
 
 export interface PromptInputProps {
@@ -101,6 +143,7 @@ export function PromptInput(props: PromptInputProps) {
   const sync = useSync()
   const local = useLocal()
   const { exit } = useApp()
+  const { setCursorPosition } = useCursor()
   const { columns } = useTerminalSize()
 
   // ---- Autocomplete ----
@@ -124,23 +167,10 @@ export function PromptInput(props: PromptInputProps) {
     cursor: stashed?.cursor ?? 0,
   }))
   const placeholderIndex = useRef(Math.floor(Math.random() * PLACEHOLDERS.length))
-  const timerId = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // ---- 批量更新渲染：多个按键合并为一次渲染（32ms 合并窗口 ~30fps） ----
-  const scheduleRender = useCallback(() => {
-    if (timerId.current !== null) clearTimeout(timerId.current)
-    timerId.current = setTimeout(() => {
-      timerId.current = null
-      setDisplay({ input: inputRef.current, cursor: cursorRef.current })
-    }, 32)
-  }, [])
-
-  // ---- 立即同步渲染（用于提交等需要即时反馈的场景） ----
+  // ---- 同步渲染：按键/提交时立即更新 display state ----
+  // React 18 自动批处理合并同一事件循环内的 setState，无需手动 32ms 合并窗口
   const syncRender = useCallback(() => {
-    if (timerId.current !== null) {
-      clearTimeout(timerId.current)
-      timerId.current = null
-    }
     setDisplay({ input: inputRef.current, cursor: cursorRef.current })
   }, [])
 
@@ -306,7 +336,7 @@ export function PromptInput(props: PromptInputProps) {
     const next = inputRef.current.slice(0, cursor) + text + inputRef.current.slice(cursor)
     inputRef.current = next
     cursorRef.current = cursor + text.length
-    scheduleRender()
+    syncRender()
     // 粘贴后隐藏 autocomplete（对标 opencode onPaste 行为）
     if (autocomplete.visible) autocomplete.hide()
   })
@@ -333,14 +363,14 @@ export function PromptInput(props: PromptInputProps) {
     if (key.leftArrow) {
       if (cursorRef.current > 0) {
         cursorRef.current -= 1
-        scheduleRender()
+        syncRender()
       }
       return
     }
     if (key.rightArrow) {
       if (cursorRef.current < inputRef.current.length) {
         cursorRef.current += 1
-        scheduleRender()
+        syncRender()
       }
       return
     }
@@ -358,7 +388,7 @@ export function PromptInput(props: PromptInputProps) {
           const c = cursorRef.current
           inputRef.current = inputRef.current.slice(0, c - 1) + inputRef.current.slice(c)
           cursorRef.current = c - 1
-          scheduleRender()
+          syncRender()
           autocomplete.onInput(inputRef.current, cursorRef.current)
         }
       }
@@ -368,7 +398,7 @@ export function PromptInput(props: PromptInputProps) {
       const c = cursorRef.current
       if (c < inputRef.current.length) {
         inputRef.current = inputRef.current.slice(0, c) + inputRef.current.slice(c + 1)
-        scheduleRender()
+        syncRender()
         autocomplete.onInput(inputRef.current, cursorRef.current)
       }
       return
@@ -380,7 +410,7 @@ export function PromptInput(props: PromptInputProps) {
       if (item) {
         inputRef.current = item.input
         cursorRef.current = item.input.length
-        scheduleRender()
+        syncRender()
       }
       return
     }
@@ -389,7 +419,7 @@ export function PromptInput(props: PromptInputProps) {
       if (item) {
         inputRef.current = item.input
         cursorRef.current = item.input.length
-        scheduleRender()
+        syncRender()
       }
       return
     }
@@ -399,11 +429,13 @@ export function PromptInput(props: PromptInputProps) {
       const c = cursorRef.current
       inputRef.current = inputRef.current.slice(0, c) + ch + inputRef.current.slice(c)
       cursorRef.current = c + ch.length
-      scheduleRender()
+      syncRender()
       // 对标 opencode onContentChange → autocomplete.onInput
       autocomplete.onInput(inputRef.current, cursorRef.current)
     }
   })
+
+  setCursorPosition(undefined)
 
   // ---- 渲染 ----
   if (props.visible === false) return null
@@ -415,24 +447,11 @@ export function PromptInput(props: PromptInputProps) {
 
   const borderColor = theme.secondary
 
-  // useMemo 缓存渲染计算，避免每次渲染重复 stringWidth
-  const { before, cursorChar, after, cursorBlockWidth } = useMemo(() => {
-    const before = input.slice(0, cursor)
-    const cursorChar = input[cursor]
-    const after = input.slice(cursor + 1)
-    const cursorBlockWidth = cursorChar ? stringWidth(cursorChar) : 1
-    return { before, cursorChar, after, cursorBlockWidth }
-  }, [input, cursor])
-
   // 对标 opencode extmark + fileStyleId/agentStyleId：根据 mention spans 分段着色
   // agent = cyan 背景，file = blue 背景，普通文本 = 白色
   const segments = useMemo(() => buildSegments(input, autocomplete.mentions), [input, autocomplete.mentions])
 
   debug.log("PromptInput", { input, cursor })
-
-  // 判断光标所在 segment 的颜色（用于 cursorChar 的背景色）
-  const cursorSegment = segments.find((s: RenderSegment) => cursor >= s.start && cursor < s.end)
-  const cursorBgColor = cursorSegment?.type === "agent" ? theme.accent : cursorSegment?.type === "file" ? theme.primary : theme.primary
 
   return (
     <Box flexDirection="column" width="100%">
@@ -459,42 +478,10 @@ export function PromptInput(props: PromptInputProps) {
       >
         <Box flexDirection="column">
           {input ? (
-            <Text>
-              {segments.map((seg: RenderSegment, i: number) => {
-                // 光标在这个 segment 内：拆分为光标前 / cursorChar / 光标后
-                if (cursor >= seg.start && cursor < seg.end) {
-                  const segBefore = seg.text.slice(0, cursor - seg.start)
-                  const segCursor = seg.text[cursor - seg.start]
-                  const segAfter = seg.text.slice(cursor - seg.start + 1)
-                  const color = seg.type === "agent" ? theme.background : seg.type === "file" ? theme.text : theme.text
-                  const bg = seg.type === "agent" ? theme.accent : seg.type === "file" ? theme.primary : undefined
-                  return <React.Fragment key={i}>
-                    {segBefore && <Text color={color} backgroundColor={bg}>{segBefore}</Text>}
-                    {segCursor ? (
-                      <Text color={theme.text} backgroundColor={cursorBgColor ?? borderColor}>{segCursor}</Text>
-                    ) : (
-                      <Text backgroundColor={theme.text}>{" "}</Text>
-                    )}
-                    {segAfter && <Text color={color} backgroundColor={bg}>{segAfter}</Text>}
-                  </React.Fragment>
-                }
-                // 光标不在这个 segment 内
-                if (seg.type === "agent") {
-                  return <Text key={i} color={theme.background} backgroundColor={theme.accent}>{seg.text}</Text>
-                }
-                if (seg.type === "file") {
-                  return <Text key={i} color={theme.text} backgroundColor={theme.primary}>{seg.text}</Text>
-                }
-                return <Text key={i} color={theme.text}>{seg.text}</Text>
-              })}
-              {/* 光标在末尾（无 segment 覆盖） */}
-              {cursor === input.length && !cursorChar && (
-                <Text backgroundColor={theme.text}>{" "}</Text>
-              )}
-            </Text>
+            <Text>{renderSegmentsWithCursor(segments, input, cursor)}</Text>
           ) : (
             <Text>
-              <Text backgroundColor={theme.text}>{" "}</Text>
+              <Text color={theme.background} backgroundColor={theme.text}>{" "}</Text>
               <Text dimColor color={theme.textMuted}>{placeholderText}</Text>
             </Text>
           )}
