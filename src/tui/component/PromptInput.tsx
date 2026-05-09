@@ -6,8 +6,9 @@
 // 2. 单一 display state 对象，合并 3 个 setState 为 1 个
 // 3. React 18 自动批处理合并同一事件循环内的 setState，无需手动合并窗口
 // 4. useMemo 缓存渲染计算（stringWidth 等）
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from "react"
 import { Box, Text, useInput, usePaste, useApp, useCursor } from "ink"
+import stringWidth from "string-width"
 import { useSession } from "../context/session.js"
 import { theme } from "../context/theme.js"
 import { useRoute } from "../context/route.js"
@@ -115,6 +116,56 @@ function renderSegmentsWithCursor(
   return elements
 }
 
+// ---- IME 光标终端位置计算 ----
+// 终端光标仅服务于输入法候选框（IME）定位
+// 视觉显示由内联反色光标承担，终端光标位置允许一定误差
+
+const YOGA_EDGE_LEFT = 0
+const YOGA_EDGE_TOP = 1
+
+function getAbsolutePosition(inkNode: any): { x: number; y: number } {
+  let x = 0
+  let y = 0
+  let node: any = inkNode
+  while (node) {
+    const yoga = node.yogaNode
+    if (yoga) {
+      const layout = yoga.getComputedLayout()
+      x += layout.left
+      y += layout.top
+      x += yoga.getComputedPadding(YOGA_EDGE_LEFT) + yoga.getComputedBorder(YOGA_EDGE_LEFT)
+      y += yoga.getComputedPadding(YOGA_EDGE_TOP) + yoga.getComputedBorder(YOGA_EDGE_TOP)
+    }
+    node = node.parentNode
+  }
+  return { x: Math.round(x), y: Math.round(y) }
+}
+
+function getCursorVisualPosition(
+  input: string,
+  cursor: number,
+  contentWidth: number,
+): { xOffset: number; yOffset: number } {
+  if (contentWidth <= 0) return { xOffset: 0, yOffset: 0 }
+  const beforeCursor = input.slice(0, cursor)
+  let currentCol = 0
+  let currentRow = 0
+  for (const char of beforeCursor) {
+    const w = stringWidth(char)
+    if (currentCol + w > contentWidth) {
+      currentRow++
+      currentCol = w
+    } else {
+      currentCol += w
+    }
+  }
+  if (currentCol >= contentWidth) {
+    currentRow++
+    currentCol = 0
+  }
+  return { xOffset: currentCol, yOffset: currentRow }
+}
+
 // ---- Props ----
 
 export interface PromptInputProps {
@@ -144,6 +195,7 @@ export function PromptInput(props: PromptInputProps) {
   const local = useLocal()
   const { exit } = useApp()
   const { setCursorPosition } = useCursor()
+  const textRef = useRef<any>(null)
   const { columns } = useTerminalSize()
 
   // ---- Autocomplete ----
@@ -435,7 +487,22 @@ export function PromptInput(props: PromptInputProps) {
     }
   })
 
-  setCursorPosition(undefined)
+  // ---- IME 光标定位（终端光标服务于输入法候选框） ----
+  const cursorBaseRef = useRef<{ x: number; y: number; contentWidth: number } | null>(null)
+
+  useLayoutEffect(() => {
+    const node = textRef.current
+    if (!node?.yogaNode) return
+    const pos = getAbsolutePosition(node)
+    setCursorPosition({ x: pos.x - 2, y: pos.y })
+  }, [columns, props.visible, props.disabled, dialog.isEmpty])
+
+  // Ink 的 setCursorPosition 会附带 \x1B[?25h（显示光标块），
+  // 在 layout effect 中立即写入 hide 序列，隐藏终端光标块但保留位置给 IME
+  useLayoutEffect(() => {
+    if (props.visible === false || props.disabled || !dialog.isEmpty) return
+    process.stdout.write("\x1B[?25l")
+  })
 
   // ---- 渲染 ----
   if (props.visible === false) return null
@@ -477,6 +544,7 @@ export function PromptInput(props: PromptInputProps) {
         flexGrow={1}
       >
         <Box flexDirection="column">
+          <Box ref={textRef}>
           {input ? (
             <Text>{renderSegmentsWithCursor(segments, input, cursor)}</Text>
           ) : (
@@ -485,6 +553,7 @@ export function PromptInput(props: PromptInputProps) {
               <Text dimColor color={theme.textMuted}>{placeholderText}</Text>
             </Text>
           )}
+          </Box>
           {/* agent/model 信息：输入框内部左下角 */}
           <Box flexDirection="row" gap={1} paddingTop={1}>
             <Text color={theme.secondary}>{agentName}</Text>
