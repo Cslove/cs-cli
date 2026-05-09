@@ -105,6 +105,7 @@ export function Toast() {
       borderStyle={SPLIT_BORDER}
       borderLeft
       borderLeftColor={color}
+      borderBackgroundColor={theme.backgroundPanel}
       paddingLeft={2}
       paddingRight={2}
       paddingTop={1}

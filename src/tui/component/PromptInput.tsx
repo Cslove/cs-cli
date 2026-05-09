@@ -521,7 +521,7 @@ export function PromptInput(props: PromptInputProps) {
   debug.log("PromptInput", { input, cursor })
 
   return (
-    <Box flexDirection="column" width="100%">
+    <Box flexDirection="column" width="100%" backgroundColor={theme.background}>
       {/* 对标 opencode：Autocomplete 绝对定位浮层，不改变输入框布局流 */}
       <AutocompletePopup
         visible={autocomplete.visible}
@@ -536,6 +536,7 @@ export function PromptInput(props: PromptInputProps) {
         borderBottom={false}
         borderLeft={true}
         borderLeftColor={borderColor}
+        borderBackgroundColor={theme.backgroundElement}
         backgroundColor={theme.backgroundElement}
         paddingLeft={1}
         paddingRight={1}
@@ -576,6 +577,7 @@ export function PromptInput(props: PromptInputProps) {
         flexDirection="row"
         justifyContent="space-between"
         paddingTop={1}
+        backgroundColor={theme.background}
       >
         {props.hint ?? (
           <Box flexDirection="column" gap={1} width="100%">

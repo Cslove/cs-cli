@@ -63,7 +63,7 @@ export function HomeView() {
           ))}
         </Box>
       ) : (
-        <Box flexShrink={0} paddingBottom={1}>
+        <Box flexShrink={0} paddingBottom={1} backgroundColor={theme.background}>
           <Text bold color="magenta">SI RONG</Text>
         </Box>
       )}

@@ -21,6 +21,7 @@ export const theme = {
   background: "#282c34",     // darkBg — 全局背景
   backgroundPanel: "#21252b", // darkBgAlt — 面板/次级背景
   backgroundElement: "#353b45", // darkBgPanel — 元素/选中项背景
+  backgroundMenu: "#353b45",   // darkBgPanel — 菜单/弹窗背景（对标 backgroundMenu）
 
   // ---- 边框 ----
   border: "#393f4a",

@@ -5,19 +5,7 @@ import React from "react"
 import { Box, Text } from "ink"
 import type { BoxStyle } from "cli-boxes"
 import type { AutocompleteOption, AutocompleteVisible } from "../hook/useAutocomplete.js"
-
-// ---- 对标 opencode SplitBorder：只显示左右竖线 ┃ ----
-
-const SPLIT_BORDER: BoxStyle = {
-  topLeft: "",
-  top: " ",
-  topRight: "",
-  right: "┃",
-  bottomRight: "",
-  bottom: " ",
-  bottomLeft: "",
-  left: "┃",
-}
+import { theme } from "../context/theme.js"
 
 // ---- Props ----
 
@@ -50,13 +38,19 @@ export function AutocompletePopup(props: AutocompletePopupProps) {
       <Box
         position="absolute"
         bottom="100"
-        borderStyle={SPLIT_BORDER}
-        borderColor="gray"
+        borderStyle="bold"
+        borderLeft={true}
+        borderRight={true}
+        borderBottom={false}
+        borderTop={false}
+        borderColor={theme.accent}
+        borderBackgroundColor={theme.backgroundMenu}
         paddingLeft={1}
         paddingRight={1}
         width={props.width}
+        backgroundColor={theme.backgroundMenu}
       >
-        <Text dimColor>No matching items</Text>
+        <Text color={theme.textMuted}>No matching items</Text>
       </Box>
     )
   }
@@ -80,39 +74,43 @@ export function AutocompletePopup(props: AutocompletePopupProps) {
       width={props.width}
       flexDirection="column"
     >
-      {/* 对标 opencode：SplitBorder + backgroundMenu(gray) + borderColor */}
+      {/* 对标 opencode：SplitBorder + backgroundMenu + borderColor */}
       <Box
         flexDirection="column"
-        borderStyle={SPLIT_BORDER}
-        borderColor="gray"
-        backgroundColor="gray"
+        borderStyle="bold"
+        borderLeft={true}
+        borderRight={true}
+        borderBottom={false}
+        borderTop={false}
+        borderColor={theme.accent}
+        borderBackgroundColor={theme.backgroundMenu}
+        backgroundColor={theme.backgroundMenu}
       >
         {visibleOptions.map((option, i) => {
           const globalIndex = scrollOffset + i
           const isSelected = globalIndex === props.selectedIndex
           const isDir = option.display.endsWith("/")
 
-          // 对标 opencode：选中项 backgroundColor=primary(cyan)，文字白色
-          // 非选中项：目录名 cyan，其他默认色
+          // 对标 opencode：选中项 backgroundColor=primary，文字 background
+          // 非选中项：目录名 accent(cyan)，其他默认色
           return (
             <Box
               key={globalIndex}
               flexDirection="row"
               paddingLeft={1}
               paddingRight={1}
-              backgroundColor={isSelected ? "cyan" : undefined}
+              backgroundColor={isSelected ? theme.primary : undefined}
             >
               <Text
-                color={isSelected ? "white" : isDir ? "cyan" : undefined}
+                color={isSelected ? theme.background : isDir ? theme.accent : theme.text}
                 bold={isSelected}
               >
                 {truncateMiddle(option.display, props.width - 4)}
               </Text>
-              {/* 对标 opencode：description 列，选中时白色，未选中时 dimColor */}
+              {/* 对标 opencode：description 列，选中时 background，未选中时 textMuted */}
               {option.description && (
                 <Text
-                  color={isSelected ? "white" : "gray"}
-                  dimColor={!isSelected}
+                  color={isSelected ? theme.background : theme.textMuted}
                 >
                   {" "}
                   {truncateMiddle(option.description, props.width - option.display.length - 6)}

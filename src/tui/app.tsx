@@ -217,7 +217,7 @@ function AppContent({ model }: { model?: string }) {
         {route.type === "home" ? (
           <HomeView />
         ) : route.type === "session" ? (
-          <Box flexDirection="column" flexGrow={1} padding={1}>
+          <Box flexDirection="column" flexGrow={1} padding={1} backgroundColor={theme.background}>
             <ChatView model={model} />
           </Box>
         ) : (
@@ -227,7 +227,7 @@ function AppContent({ model }: { model?: string }) {
         )}
       </Box>
       {/* 固定在终端最底行左下角的连接状态指示器 */}
-      <Box flexDirection="row" gap={1} paddingLeft={2} paddingBottom={1} flexShrink={0}>
+      <Box flexDirection="row" gap={1} paddingLeft={2} paddingBottom={1} flexShrink={0} backgroundColor={theme.background}>
         <Text color={event.connected ? theme.success : theme.error}>●</Text>
         <Text dimColor color={theme.textMuted}>{event.connected ? "Connected" : "Disconnected"}</Text>
       </Box>
