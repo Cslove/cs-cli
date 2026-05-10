@@ -22,6 +22,7 @@ import type { AssistantContext } from "./AssistantMessage.js"
 import { StatusBar } from "./StatusBar.js"
 import { PromptInput } from "./PromptInput.js"
 import type { RenderPart, TextPart, ToolPart, Message } from "../../shared/types.js"
+import { debug } from "../util/debug.js"
 
 export function ChatView({ model }: { model?: string }) {
   const { route, navigate } = useRoute()
@@ -36,6 +37,10 @@ export function ChatView({ model }: { model?: string }) {
   const promptRef = usePromptRef()
 
   const sessionID = route.type === "session" ? route.sessionId : undefined
+
+  useEffect(() => {
+    if (sessionID) { void sync.session.sync(sessionID) }
+  }, [sessionID, sync.session])
 
   // ---- 派生状态 ----
 
