@@ -579,7 +579,7 @@ export function PromptInput(props: PromptInputProps) {
         paddingTop={1}
         backgroundColor={theme.background}
       >
-        {props.hint ?? (
+        {props.hint !== undefined ? props.hint : (
           <Box flexDirection="column" gap={1} width="100%">
             <Box flexDirection="row" justifyContent="space-between">
               <Text dimColor color={theme.textMuted}>ctrl+n  New session</Text>

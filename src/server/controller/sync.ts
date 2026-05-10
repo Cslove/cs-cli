@@ -10,7 +10,39 @@ import { SessionService } from "../service/session.js"
 import { TodoService } from "../service/todo.js"
 import { PartService } from "../service/part.js"
 import { EventService } from "../service/event.js"
-import type { BootstrapData, SessionSyncData, Config } from "../../shared/types.js"
+import type { BootstrapData, SessionSyncData, Config, Session, Message } from "../../shared/types.js"
+import type { MessageEntity } from "../entity/message.js"
+import type { SessionEntity } from "../entity/session.js"
+
+function toMessage(entity: MessageEntity): Message {
+  const tokens = entity.tokens ? JSON.parse(entity.tokens) : undefined
+  const error = entity.error ? JSON.parse(entity.error) : undefined
+  return {
+    id: entity.id,
+    session_id: entity.session_id,
+    role: entity.role,
+    content: entity.content,
+    model: entity.model,
+    created_at: entity.created_at,
+    time: { created: entity.created_at, completed: entity.time_completed || undefined },
+    agent: entity.agent || undefined,
+    mode: entity.mode || undefined,
+    tokens,
+    cost: entity.cost || undefined,
+    error,
+    finish: entity.finish || undefined,
+    providerID: entity.provider_id || undefined,
+    modelID: entity.model_id || undefined,
+    parentID: entity.parent_id || undefined,
+  }
+}
+
+function toSession(entity: SessionEntity): Session {
+  return {
+    ...entity,
+    time: { created: entity.created_at, updated: entity.updated_at },
+  }
+}
 
 @Controller("/api/sync")
 export class SyncController {
@@ -68,7 +100,7 @@ export class SyncController {
       }
     }
 
-    return { provider, agent, config, session: sessions, command, session_status }
+    return { provider, agent, config, session: sessions.map(toSession), command, session_status }
   }
 
   /**
@@ -88,9 +120,9 @@ export class SyncController {
     ])
 
     return {
-      session,
+      session: toSession(session),
       messages: messages.map((m) => ({
-        ...m,
+        ...toMessage(m),
         parts: partsMap[m.id] ?? [],
       })),
       todos,

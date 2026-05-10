@@ -362,6 +362,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
           parent_id: d.parent_id ?? existing?.parent_id ?? null,
           created_at: d.created_at ?? existing?.created_at ?? Date.now(),
           updated_at: Date.now(),
+          time: existing?.time ?? { created: d.created_at ?? Date.now(), updated: Date.now() },
         },
       })
     }))
