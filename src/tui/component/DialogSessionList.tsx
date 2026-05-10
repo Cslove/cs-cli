@@ -2,13 +2,14 @@
 // Ink 版本：delete(ctrl+d 双击确认) + rename(ctrl+r 行内编辑) + filter 始终显示
 import React, { useState, useMemo, useRef } from "react"
 import { Box, Text, useInput } from "ink"
-import { useDialog, DialogTitle, DialogItem } from "../context/dialog.js"
+import { useDialog, DialogTitle, DialogItem, useDialogScroll } from "../context/dialog.js"
 import { useSync } from "../context/sync.js"
 import { useRoute } from "../context/route.js"
 import { useKeybind } from "../context/keybind.js"
 import { useApi } from "../context/api.js"
 import { useToast } from "../context/toast.js"
 import { theme } from "../context/theme.js"
+import { useVirtualScroll } from "../hook/useVirtualScroll.js"
 
 type Mode = "select" | "rename"
 
@@ -19,6 +20,7 @@ export function DialogSessionList() {
   const keybind = useKeybind()
   const api = useApi()
   const toast = useToast()
+  const { maxHeight } = useDialogScroll()
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [filter, setFilter] = useState("")
   const [toDelete, setToDelete] = useState<string | null>(null)
@@ -128,12 +130,17 @@ export function DialogSessionList() {
   // 按日期分组
   const today = new Date().toDateString()
   const categories = new Map<string, typeof sessions>()
+  const flatSessions: typeof sessions = []
   for (const session of sessions) {
     const date = new Date(session.updated_at)
     const cat = date.toDateString() === today ? "Today" : date.toDateString()
     if (!categories.has(cat)) categories.set(cat, [])
     categories.get(cat)!.push(session)
+    flatSessions.push(session)
   }
+
+  // 虚拟滚动
+  const { scrollOffset, visibleEnd } = useVirtualScroll(maxHeight, selectedIndex, 4 + categories.size)
 
   return (
     <Box flexDirection="column">
@@ -150,30 +157,37 @@ export function DialogSessionList() {
           <Text backgroundColor={theme.text}>{" "}</Text>
         </Box>
       )}
-      {Array.from(categories.entries()).map(([category, items]) => (
-        <Box key={category} flexDirection="column" marginBottom={1}>
-          <Text bold color={theme.textMuted}>{category}</Text>
-          {items.map((session) => {
-            const globalIdx = sessions.indexOf(session)
-            const isCurrent = session.id === currentSessionId
-            const isDeleting = toDelete === session.id
-            const isRenaming = mode === "rename" && globalIdx === selectedIndex
-            const label = isDeleting
-              ? `Press ${keybind.print("session_delete")} again to confirm`
-              : isRenaming
-                ? renameText
-                : session.title + (isCurrent ? " (current)" : "")
-            return (
-              <DialogItem
-                key={session.id}
-                label={label}
-                description={isDeleting ? undefined : formatTime(session.updated_at)}
-                selected={globalIdx === selectedIndex}
-              />
-            )
-          })}
-        </Box>
-      ))}
+      {Array.from(categories.entries()).map(([category, items]) => {
+        const visibleItems = items.filter((s) => {
+          const idx = flatSessions.indexOf(s)
+          return idx >= scrollOffset && idx < visibleEnd
+        })
+        if (visibleItems.length === 0) return null
+        return (
+          <Box key={category} flexDirection="column" marginBottom={1} flexShrink={0}>
+            <Text bold color={theme.textMuted}>{category}</Text>
+            {visibleItems.map((session) => {
+              const globalIdx = flatSessions.indexOf(session)
+              const isCurrent = session.id === currentSessionId
+              const isDeleting = toDelete === session.id
+              const isRenaming = mode === "rename" && globalIdx === selectedIndex
+              const label = isDeleting
+                ? `Press ${keybind.print("session_delete")} again to confirm`
+                : isRenaming
+                  ? renameText
+                  : session.title + (isCurrent ? " (current)" : "")
+              return (
+                <DialogItem
+                  key={session.id}
+                  label={label}
+                  description={isDeleting ? undefined : formatTime(session.updated_at)}
+                  selected={globalIdx === selectedIndex}
+                />
+              )
+            })}
+          </Box>
+        )
+      })}
       {sessions.length === 0 && (
         <Text dimColor>No sessions found</Text>
       )}

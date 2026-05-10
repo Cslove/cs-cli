@@ -5,6 +5,19 @@ import { Box, Text, useInput } from "ink"
 import { useTerminalSize } from "../hook/useTerminalSize.js"
 import { theme } from "./theme.js"
 
+// ---- Dialog Scroll Context（虚拟滚动支持） ----
+
+interface DialogScrollValue {
+  /** 弹窗内可用于渲染内容的最大行数 */
+  maxHeight: number
+}
+
+const DialogScrollCtx = createContext<DialogScrollValue>({ maxHeight: 999 })
+
+export function useDialogScroll() {
+  return useContext(DialogScrollCtx)
+}
+
 // ---- State ----
 
 interface DialogEntry {
@@ -147,27 +160,32 @@ export function useDialog() {
 function DialogOverlay({ children, size }: { children: React.ReactNode; size: DialogState["size"] }) {
   const { columns, rows } = useTerminalSize()
   const width = size === "large" ? Math.min(88, columns - 4) : Math.min(60, columns - 4)
+  // 留给 chrome（标题+filter+footer+padding）约 6 行，其余给列表
+  const maxHeight = Math.max(6, rows - 6)
 
   return (
-    <Box
-      position="absolute"
-      width={columns}
-      height={rows}
-      left={0}
-      top={0}
-      alignItems="center"
-      justifyContent="center"
-    >
+    <DialogScrollCtx.Provider value={{ maxHeight }}>
       <Box
-        flexDirection="column"
-        width={width}
-        backgroundColor={theme.backgroundPanel}
-        paddingX={2}
-        paddingY={1}
+        position="absolute"
+        width={columns}
+        height={rows}
+        left={0}
+        top={0}
+        alignItems="center"
+        justifyContent="center"
       >
-        {children}
+        <Box
+          flexDirection="column"
+          width={width}
+          maxHeight={maxHeight}
+          backgroundColor={theme.backgroundPanel}
+          paddingX={2}
+          paddingY={1}
+        >
+          {children}
+        </Box>
       </Box>
-    </Box>
+    </DialogScrollCtx.Provider>
   )
 }
 
@@ -175,7 +193,7 @@ function DialogOverlay({ children, size }: { children: React.ReactNode; size: Di
 
 export function DialogTitle({ children }: { children: React.ReactNode }) {
   return (
-    <Box marginBottom={1}>
+    <Box marginBottom={1} flexShrink={0}>
       <Text bold>{children}</Text>
     </Box>
   )
@@ -195,7 +213,7 @@ export function DialogItem({
   onSelect?: () => void
 }) {
    return (
-    <Box flexDirection="row" gap={1} backgroundColor={selected ? theme.backgroundElement : undefined} paddingX={1}>
+    <Box flexDirection="row" gap={1} backgroundColor={selected ? theme.backgroundElement : undefined} paddingX={1} flexShrink={0}>
       <Text color={selected ? theme.accent : theme.textMuted}>{selected ? "▸" : " "} </Text>
       <Text bold={selected} color={selected ? theme.text : undefined}>{label}</Text>
       {description && <Text dimColor={!selected} color={selected ? theme.textMuted : undefined}> {description}</Text>}
@@ -206,7 +224,7 @@ export function DialogItem({
 
 export function DialogFooter({ children }: { children?: React.ReactNode }) {
   return (
-    <Box marginTop={1} flexDirection="row" gap={1}>
+    <Box marginTop={1} flexDirection="row" gap={1} flexShrink={0}>
       <Text dimColor color={theme.textMuted}>Esc to close</Text>
       {children}
     </Box>

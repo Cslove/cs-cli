@@ -2,9 +2,10 @@
 // Ink 版本：简化了 opentui 的 fuzzy search 和复杂 UI，保留核心的命令注册 + 列表选择
 import React, { createContext, useContext, useState, useCallback } from "react"
 import { Box, Text, useInput } from "ink"
-import { useDialog, DialogTitle, DialogItem, DialogFooter } from "./dialog.js"
+import { useDialog, DialogTitle, DialogItem, DialogFooter, useDialogScroll } from "./dialog.js"
 import { useKeybind } from "./keybind.js"
 import { theme } from "./theme.js"
+import { useVirtualScroll } from "../hook/useVirtualScroll.js"
 
 // ---- Types ----
 
@@ -175,6 +176,7 @@ function CommandPanel({
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [filter, setFilter] = useState("")
   const keybind = useKeybind()
+  const { maxHeight } = useDialogScroll()
 
   // 过滤
   const filtered = options.filter((o) => {
@@ -199,7 +201,10 @@ function CommandPanel({
 
   const current = flatItems[selectedIndex]
 
-  useInput((ch, key) => {
+  // 虚拟滚动
+  const { scrollOffset, visibleEnd } = useVirtualScroll(maxHeight, selectedIndex, 4 + categories.size)
+
+  useInput((ch, key) =>{
     if (key.upArrow) {
       setSelectedIndex((prev) => (prev > 0 ? prev - 1 : flatItems.length - 1))
     } else if (key.downArrow) {
@@ -224,23 +229,31 @@ function CommandPanel({
           <Text color={theme.accent}>{filter}</Text>
         </Box>
       )}
-      {Array.from(categories.entries()).map(([category, items]) => (
-        <Box key={category} flexDirection="column" marginBottom={1}>
-          <Text bold color={theme.textMuted}>{category}</Text>
-          {items.map((option) => {
-            const globalIdx = flatItems.indexOf(option)
-            return (
-              <DialogItem
-                key={option.value}
-                label={option.title}
-                description={option.description}
-                selected={globalIdx === selectedIndex}
-                keybind={option.keybind ? keybind.print(option.keybind) : undefined}
-              />
-            )
-          })}
-        </Box>
-      ))}
+      {Array.from(categories.entries()).map(([category, items]) => {
+        // 虚拟渲染：只渲染可视窗口内的条目
+        const visibleItems = items.filter((opt) => {
+          const idx = flatItems.indexOf(opt)
+          return idx >= scrollOffset && idx < visibleEnd
+        })
+        if (visibleItems.length === 0) return null
+        return (
+          <Box key={category} flexDirection="column" marginBottom={1}>
+            <Text bold color={theme.textMuted}>{category}</Text>
+            {visibleItems.map((option) => {
+              const globalIdx = flatItems.indexOf(option)
+              return (
+                <DialogItem
+                  key={option.value}
+                  label={option.title}
+                  description={option.description}
+                  selected={globalIdx === selectedIndex}
+                  keybind={option.keybind ? keybind.print(option.keybind) : undefined}
+                />
+              )
+            })}
+          </Box>
+        )
+      })}
       {flatItems.length === 0 && (
         <Text dimColor>No matching commands</Text>
       )}
