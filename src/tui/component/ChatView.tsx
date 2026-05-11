@@ -1,5 +1,5 @@
 // 对标 opencode session/index.tsx —— Session 会话核心组件
-import React, { useMemo, useState, useEffect } from "react"
+import React, { useMemo, useState, useEffect, useRef } from "react"
 import { Box, Text } from "ink"
 import { theme } from "../context/theme.js"
 import { useSession } from "../context/session.js"
@@ -21,6 +21,8 @@ import { AssistantMessage, AssistantContextProvider } from "./AssistantMessage.j
 import type { AssistantContext } from "./AssistantMessage.js"
 import { StatusBar } from "./StatusBar.js"
 import { PromptInput } from "./PromptInput.js"
+import { Scrollbox } from "./Scrollbox.js"
+import type { ScrollboxHandle } from "./Scrollbox.js"
 import type { RenderPart, TextPart, ToolPart, Message } from "../../shared/types.js"
 import { debug } from "../util/debug.js"
 
@@ -98,7 +100,9 @@ export function ChatView({ model }: { model?: string }) {
   const [showThinking, setShowThinking] = useState(kv.get<boolean>("thinking_visibility", true))
   const [showTimestamps, setShowTimestamps] = useState(kv.get<string>("timestamps", "hide") === "show")
   const [showDetails, setShowDetails] = useState(kv.get<boolean>("tool_details_visibility", true))
-  const [showScrollbar, setShowScrollbar] = useState(false)
+  const [showScrollbar, setShowScrollbar] = useState(true)
+
+  const scrollRef = useRef<ScrollboxHandle>(null)
 
   const wide = columns > 120
   const sidebarVisible = !session?.parent_id && showSidebar && wide
@@ -383,8 +387,8 @@ export function ChatView({ model }: { model?: string }) {
           {/* Status 栏 */}
           <StatusBar model={modelName} loading={false} status={sessionStatus} agent={agentName} />
 
-          {/* 消息区域 */}
-          <Box flexDirection="column" flexGrow={1}>
+          {/* 消息区域：Scrollbox 底部粘滞 + 可滚动 */}
+          <Scrollbox ref={scrollRef} flexGrow={1} sticky stickyStart="bottom" scrollbar={showScrollbar}>
             {messages.map((msg, idx) => {
               const msgParts = getParts(msg.id)
 
@@ -448,7 +452,7 @@ export function ChatView({ model }: { model?: string }) {
 
               return null
             })}
-          </Box>
+          </Scrollbox>
 
           {/* 底部区域 */}
           <Box flexShrink={0} flexDirection="column">

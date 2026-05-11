@@ -456,8 +456,8 @@ export function PromptInput(props: PromptInputProps) {
       return
     }
 
-    // 历史导航
-    if (key.upArrow && cursorRef.current === 0) {
+    // 历史导航（仅在输入非空时触发；空输入时留给 Scrollbox 滚动消息区）
+    if (key.upArrow && cursorRef.current === 0 && inputRef.current.length > 0) {
       const item = promptHistory.move(-1, inputRef.current)
       if (item) {
         inputRef.current = item.input
@@ -466,7 +466,7 @@ export function PromptInput(props: PromptInputProps) {
       }
       return
     }
-    if (key.downArrow && cursorRef.current === inputRef.current.length) {
+    if (key.downArrow && cursorRef.current === inputRef.current.length && inputRef.current.length > 0) {
       const item = promptHistory.move(1, inputRef.current)
       if (item) {
         inputRef.current = item.input
