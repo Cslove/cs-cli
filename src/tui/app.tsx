@@ -217,9 +217,7 @@ function AppContent({ model }: { model?: string }) {
         {route.type === "home" ? (
           <HomeView />
         ) : route.type === "session" ? (
-          <Box flexDirection="column" flexGrow={1} padding={1} backgroundColor={theme.background}>
-            <ChatView model={model} />
-          </Box>
+          <ChatView model={model} />
         ) : (
           <Box>
             <Text color={theme.error}>Unknown route</Text>

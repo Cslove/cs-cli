@@ -381,9 +381,9 @@ export function ChatView({ model }: { model?: string }) {
 
   return (
     <AssistantContextProvider value={assistantContext}>
-      <Box flexDirection="row" flexGrow={1}>
+      <Box flexDirection="row" flexGrow={1} paddingLeft={2} paddingRight={2} paddingTop={1}>
         {/* 主内容区 */}
-        <Box flexDirection="column" flexGrow={1} paddingBottom={1} paddingLeft={2} paddingRight={2}>
+        <Box flexDirection="column" flexGrow={1}>
           {/* Status 栏 */}
           <StatusBar model={modelName} loading={false} status={sessionStatus} agent={agentName} />
 
