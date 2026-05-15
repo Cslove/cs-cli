@@ -101,6 +101,7 @@ export function ChatView({ model }: { model?: string }) {
   const [showTimestamps, setShowTimestamps] = useState(kv.get<string>("timestamps", "hide") === "show")
   const [showDetails, setShowDetails] = useState(kv.get<boolean>("tool_details_visibility", true))
   const [showScrollbar, setShowScrollbar] = useState(true)
+  const [autocompleteFocused, setAutocompleteFocused] = useState(false)
 
   const scrollRef = useRef<ScrollboxHandle>(null)
 
@@ -388,7 +389,7 @@ export function ChatView({ model }: { model?: string }) {
           <StatusBar model={modelName} loading={false} status={sessionStatus} agent={agentName} />
 
           {/* 消息区域：Scrollbox 底部粘滞 + 可滚动 */}
-          <Scrollbox ref={scrollRef} flexGrow={1} sticky stickyStart="bottom" scrollbar={showScrollbar}>
+          <Scrollbox ref={scrollRef} flexGrow={1} sticky stickyStart="bottom" scrollbar={showScrollbar} keyboard={!autocompleteFocused}>
             {messages.map((msg, idx) => {
               const msgParts = getParts(msg.id)
 
@@ -471,6 +472,7 @@ export function ChatView({ model }: { model?: string }) {
                 disabled={disabled}
                 sessionID={sessionID}
                 hint={null}
+                onAutocompleteFocusChange={setAutocompleteFocused}
               />
             )}
           </Box>

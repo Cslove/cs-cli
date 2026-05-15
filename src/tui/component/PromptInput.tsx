@@ -180,6 +180,8 @@ export interface PromptInputProps {
   /** 底部提示行 */
   hint?: React.ReactNode
   sessionID?: string
+  /** autocomplete 焦点变化回调：弹出时通知上层屏蔽其他组件键盘 */
+  onAutocompleteFocusChange?: (focused: boolean) => void
 }
 
 // ---- Component ----
@@ -206,6 +208,11 @@ export function PromptInput(props: PromptInputProps) {
       syncRender()
     },
   })
+
+  // 通知上层 autocomplete 焦点状态，屏蔽 Scrollbox 等其他组件键盘
+  useEffect(() => {
+    props.onAutocompleteFocusChange?.(autocomplete.visible !== false)
+  }, [autocomplete.visible])
 
   // ---- 真实输入状态（ref，不触发渲染） ----
   const inputRef = useRef(stashed?.input ?? "")
@@ -400,6 +407,7 @@ export function PromptInput(props: PromptInputProps) {
     if (!dialog.isEmpty) return
 
     // Autocomplete 键盘优先处理（对标 opencode 的 autocomplete.onKeyDown）
+    // autocomplete 打开时独占上下键等，屏蔽所有其他按键逻辑
     if (autocomplete.visible) {
       if (autocomplete.handleKey(ch, key)) return
     }
