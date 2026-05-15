@@ -527,7 +527,7 @@ export function PromptInput(props: PromptInputProps) {
         visible={autocomplete.visible}
         options={autocomplete.options}
         selectedIndex={autocomplete.selectedIndex}
-        width={Math.floor(columns * 0.7)}
+        width="100%"
       />
       <Box
         borderStyle="bold"

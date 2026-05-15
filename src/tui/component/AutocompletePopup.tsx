@@ -13,8 +13,7 @@ interface AutocompletePopupProps {
   visible: AutocompleteVisible
   options: AutocompleteOption[]
   selectedIndex: number
-  /** 可用宽度（对标 opencode anchor().width） */
-  width: number
+  width: number | string
 }
 
 // ---- Constants ----
@@ -33,6 +32,9 @@ function truncateMiddle(text: string, maxWidth: number): string {
 
 export function AutocompletePopup(props: AutocompletePopupProps) {
   if (!props.visible) return null
+
+  const truncWidth = typeof props.width === "number" ? props.width : 60
+
   if (props.options.length === 0) {
     return (
       <Box
@@ -105,7 +107,7 @@ export function AutocompletePopup(props: AutocompletePopupProps) {
                 color={isSelected ? theme.background : isDir ? theme.accent : theme.text}
                 bold={isSelected}
               >
-                {truncateMiddle(option.display, props.width - 4)}
+                {truncateMiddle(option.display, truncWidth - 4)}
               </Text>
               {/* 对标 opencode：description 列，选中时 background，未选中时 textMuted */}
               {option.description && (
@@ -113,7 +115,7 @@ export function AutocompletePopup(props: AutocompletePopupProps) {
                   color={isSelected ? theme.background : theme.textMuted}
                 >
                   {" "}
-                  {truncateMiddle(option.description, props.width - option.display.length - 6)}
+                  {truncateMiddle(option.description, truncWidth - option.display.length - 6)}
                 </Text>
               )}
             </Box>
