@@ -152,6 +152,7 @@ export const Scrollbox = forwardRef<ScrollboxHandle, ScrollboxProps>(
         flexGrow={height ? 0 : flexGrow}
         overflow="hidden"
         position="relative"
+        width="100%"
       >
         {/* 内容区：绝对定位 + top 偏移实现滚动 */}
         <Box
@@ -159,6 +160,7 @@ export const Scrollbox = forwardRef<ScrollboxHandle, ScrollboxProps>(
           position="absolute"
           top={-scrollTop}
           left={0}
+          width="100%"
           flexDirection="column"
           paddingRight={showScrollbar ? 1 : 0}
         >

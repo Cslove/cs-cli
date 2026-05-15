@@ -190,7 +190,7 @@ function ReasoningDisplay({ part }: { part: ReasoningPart }) {
       borderRight={false}
       borderTop={false}
       borderBottom={false}
-      borderLeftColor={theme.border}
+      borderLeftColor={theme.backgroundElement}
       paddingLeft={2}
       marginTop={1}
       flexDirection="column"

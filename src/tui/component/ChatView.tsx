@@ -77,7 +77,6 @@ export function ChatView({ model }: { model?: string }) {
   }, [children, sync.data.question, session])
 
   const visible = !session?.parent_id && permissions.length === 0 && questions.length === 0
-  const disabled = permissions.length > 0 || questions.length > 0
 
   const pending = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -85,6 +84,8 @@ export function ChatView({ model }: { model?: string }) {
     }
     return undefined
   }, [messages])
+
+  const disabled = permissions.length > 0 || questions.length > 0 || !!pending
 
   const lastAssistant = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -98,7 +99,7 @@ export function ChatView({ model }: { model?: string }) {
   const [showSidebar, setShowSidebar] = useState(kv.get<string>("sidebar", "auto") !== "hide")
   const [conceal, setConceal] = useState(kv.get<boolean>("conceal", true))
   const [showThinking, setShowThinking] = useState(kv.get<boolean>("thinking_visibility", true))
-  const [showTimestamps, setShowTimestamps] = useState(kv.get<string>("timestamps", "hide") === "show")
+  const [showTimestamps, setShowTimestamps] = useState(kv.get<string>("timestamps", "show") === "show")
   const [showDetails, setShowDetails] = useState(kv.get<boolean>("tool_details_visibility", true))
   const [showScrollbar, setShowScrollbar] = useState(true)
   const [autocompleteFocused, setAutocompleteFocused] = useState(false)
@@ -382,9 +383,9 @@ export function ChatView({ model }: { model?: string }) {
 
   return (
     <AssistantContextProvider value={assistantContext}>
-      <Box flexDirection="row" flexGrow={1} paddingLeft={2} paddingRight={2} paddingTop={1}>
+      <Box flexDirection="row" flexGrow={1} paddingLeft={2} paddingRight={2} paddingBottom={1} width="100%">
         {/* 主内容区 */}
-        <Box flexDirection="column" flexGrow={1}>
+        <Box flexDirection="column" flexGrow={1} gap={1} width="100%">
           {/* Status 栏 */}
           <StatusBar model={modelName} loading={false} status={sessionStatus} agent={agentName} />
 
@@ -398,11 +399,13 @@ export function ChatView({ model }: { model?: string }) {
                 return (
                   <Box key={msg.id} flexShrink={0}
                     borderStyle="single" borderLeft={true} borderRight={false} borderTop={false} borderBottom={false}
-                    borderLeftColor={theme.border} marginTop={1}
-                    paddingTop={1} paddingBottom={1} paddingLeft={2}
-                    backgroundColor={theme.backgroundPanel}
-                    flexDirection="column"
+                    borderLeftColor={theme.backgroundPanel} marginTop={1}
                   >
+                    <Box
+                      paddingTop={1} paddingBottom={1} paddingLeft={2}
+                      backgroundColor={theme.backgroundPanel}
+                      flexDirection="column"
+                    >
                     <Text color={theme.textMuted}>{revert.reverted.length} message(s) reverted</Text>
                     <Text color={theme.textMuted}>
                       <Text color={theme.text}>Ctrl+Shift+Z</Text> or /redo to restore
@@ -418,6 +421,7 @@ export function ChatView({ model }: { model?: string }) {
                         ))}
                       </Box>
                     )}
+                    </Box>
                   </Box>
                 )
               }
@@ -433,7 +437,6 @@ export function ChatView({ model }: { model?: string }) {
                     message={msg}
                     parts={msgParts}
                     index={idx}
-                    pending={pending}
                     showTimestamps={showTimestamps}
                   />
                 )

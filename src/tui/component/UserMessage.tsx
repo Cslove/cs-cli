@@ -1,23 +1,44 @@
 // 对标 opencode session/index.tsx 的 UserMessage 渲染
-import React, { useMemo, useState } from "react"
+// ╻ 左竖线 agent 色  ╻ 文本 paddingLeft=3  ╻ 文件徽标
+import React, { useMemo } from "react"
 import { Box, Text } from "ink"
 import { theme as t } from "../context/theme.js"
-import { useLocal } from "../context/local.js"
 import type { Message, RenderPart, TextPart, FilePart } from "../../shared/types.js"
+
+// ---- MIME 缩写 ----
+
+const MIME_BADGE: Record<string, string> = {
+  "text/plain": "txt",
+  "image/png": "img",
+  "image/jpeg": "img",
+  "image/gif": "img",
+  "image/webp": "img",
+  "application/pdf": "pdf",
+  "application/x-directory": "dir",
+}
+
+function mimeBadge(mime: string) {
+  return MIME_BADGE[mime] ?? mime
+}
+
+function mimeBg(mime: string) {
+  if (mime.startsWith("image/")) return t.accent
+  if (mime === "application/pdf") return t.primary
+  return t.secondary
+}
+
+// ---- 接口 ----
 
 interface UserMessageProps {
   message: Message
   parts: RenderPart[]
   index: number
-  pending?: string
-  onSelect?: () => void
   showTimestamps: boolean
 }
 
-export function UserMessage({ message, parts, index, pending, onSelect, showTimestamps }: UserMessageProps) {
-  const local = useLocal()
-  const [hover, setHover] = useState(false)
+// ---- 组件 ----
 
+export function UserMessage({ message, parts, index, showTimestamps }: UserMessageProps) {
   // 提取文本内容（非 synthetic 的 text parts）
   const textContent = useMemo(() => {
     return parts
@@ -31,58 +52,73 @@ export function UserMessage({ message, parts, index, pending, onSelect, showTime
     return parts.filter((p): p is FilePart => p.type === "file")
   }, [parts])
 
-  // 队列状态：若有更高消息 ID 的 pending assistant
-  const queued = !!(pending && message.id > pending)
+  const agentColor = t.secondary
 
-  const agentColor = useMemo(() => {
-    return t.primary
-  }, [])
-
-  const queuedFg = t.background
+  if (!textContent) {
+    // 纯文件消息也显示
+    if (files.length === 0) return null
+  }
 
   return (
     <Box
-      flexDirection="column"
+      borderStyle="bold"
+      borderLeft={true}
+      borderRight={false}
+      borderTop={false}
+      borderBottom={false}
+      width="100%"
+      borderLeftColor={agentColor}
       marginTop={index === 0 ? 0 : 1}
+      flexShrink={0}
     >
-      {/* 消息头部：序号 + 用户标识 */}
-      <Box paddingLeft={2}>
-        <Text>
-          <Text color={agentColor} bold>You</Text>
-          {queued && (
-            <Text>
-              {" "}
-              <Text backgroundColor={agentColor} color={queuedFg} bold> QUEUED </Text>
-            </Text>
+      <Box
+        paddingTop={1}
+        paddingBottom={1}
+        paddingLeft={2}
+        width="100%"
+        backgroundColor={t.backgroundPanel}
+      >
+        <Box flexDirection="column">
+          {/* 文本内容 */}
+          {textContent && (
+            <Text color={t.text}>{textContent}</Text>
           )}
+
+          {/* 文件附件：徽标样式 */}
+          {files.length > 0 && (
+            <Box flexDirection="row" paddingBottom={showTimestamps && message.time ? 1 : 0} paddingTop={1}>
+              {files.map((file, i) => (
+                <Text key={i}>
+                  <Text backgroundColor={mimeBg(file.mime)} color={t.background}> {mimeBadge(file.mime)} </Text>
+                  <Text backgroundColor={t.backgroundElement} color={t.textMuted}>
+                    {file.filename ?? file.url}
+                  </Text>
+                  {i < files.length - 1 && <Text> </Text>}
+                </Text>
+              ))}
+            </Box>
+          )}
+
+          {/* Footer：时间戳 */}
           {showTimestamps && message.time && (
-            <Text color={t.textMuted}> · {formatTime(message.time.created)}</Text>
-          )}
-        </Text>
-      </Box>
-
-      {/* 文本内容 */}
-      {textContent && (
-        <Box paddingLeft={3} marginTop={0}>
-          <Text color={t.text}>{textContent}</Text>
-        </Box>
-      )}
-
-      {/* 文件附件 */}
-      {files.length > 0 && (
-        <Box paddingLeft={3} flexDirection="column">
-          {files.map((file, i) => (
-            <Text key={i} color={t.textMuted}>
-              📎 {file.filename ?? file.url}
+            <Text color={t.textMuted} dimColor>
+              {formatTime(message.time.created)}
             </Text>
-          ))}
+          )}
         </Box>
-      )}
+      </Box>
     </Box>
   )
 }
 
+// ---- 工具函数 ----
+
 function formatTime(timestamp: number): string {
   const d = new Date(timestamp)
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  const h = String(d.getHours()).padStart(2, "0")
+  const min = String(d.getMinutes()).padStart(2, "0")
+  return `${y}-${m}-${day} ${h}:${min}`
 }

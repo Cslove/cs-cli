@@ -19,21 +19,17 @@ export function StatusBar({ model, loading, status, agent }: StatusBarProps) {
     : sessionStatus === "compacting" ? theme.info
     : theme.textMuted
 
-  const statusText = sessionStatus === "working" ? "Thinking..."
-    : sessionStatus === "compacting" ? "Compacting..."
-    : "Ready"
-
   return (
-    <Box justifyContent="space-between" paddingX={1}>
-      <Box flexDirection="row" gap={2}>
-        {agent && <Text color={theme.secondary}>{agent}</Text>}
+    <Box flexShrink={0} justifyContent="flex-end" paddingX={1}>
+      <Text>
+        {agent && <Text color={theme.secondary}>{agent} · </Text>}
         <Text dimColor color={theme.textMuted}>{modelLabel}</Text>
-      </Box>
-      <Box flexDirection="row" gap={2}>
-        <Text color={statusColor}>{statusText}</Text>
-      </Box>
-      <Text dimColor color={theme.textMuted}>
-        Ctrl+N: New | Ctrl+L: Sessions | Ctrl+P: Cmds
+        <Text color={statusColor}> · </Text>
+        <Text color={statusColor}>
+          {sessionStatus === "working" ? "thinking"
+            : sessionStatus === "compacting" ? "compacting"
+            : "ready"}
+        </Text>
       </Text>
     </Box>
   )
