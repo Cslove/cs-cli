@@ -79,15 +79,6 @@ export function ChatView({ model }: { model?: string }) {
 
   const visible = !session?.parent_id && permissions.length === 0 && questions.length === 0
 
-  const pending = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === "assistant" && !messages[i].time?.completed) return messages[i].id
-    }
-    return undefined
-  }, [messages])
-
-  const disabled = permissions.length > 0 || questions.length > 0 || !!pending
-
   const lastAssistant = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].role === "assistant") return messages[i]
@@ -201,6 +192,8 @@ export function ChatView({ model }: { model?: string }) {
     if (!sessionID) return "idle" as const
     return (sync.data.session_status[sessionID] as "idle" | "working" | "compacting" | undefined) ?? "idle"
   }, [sync.data.session_status, sessionID])
+
+  const disabled = permissions.length > 0 || questions.length > 0 || sessionStatus === "working"
 
   const promptHint = useMemo(() => {
     const cmdKey = keybind.print("command_list")

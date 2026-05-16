@@ -8,6 +8,7 @@ import { EventService } from "../event.js"
 import type { MessageEntity } from "../../entity/message.js"
 import type { PartEntity } from "../../entity/part.js"
 import type { PartInput } from "../../../shared/types.js"
+import { toMessage } from "../../util/convert.js"
 
 /**
  * Assistant 流式写入 handle —— 对标 opencode SessionProcessor.Handle
@@ -101,7 +102,7 @@ export class SessionProcessorService {
       ...(input.system !== undefined && { system: input.system }),
       ...(input.tools !== undefined && { tools: input.tools }),
     })
-    this.eventService.emit("message.created", message)
+    this.eventService.emit("message.created", toMessage(message))
 
     // 3. 逐个落 parts 并推 message.part.updated 事件（与现有 sync.tsx 事件契约一致）
     const persisted: PartEntity[] = []
@@ -152,7 +153,7 @@ export class SessionProcessorService {
       ...(input.mode !== undefined && { mode: input.mode }),
       ...(input.path !== undefined && { path: input.path }),
     })
-    this.eventService.emit("message.created", message)
+    this.eventService.emit("message.created", toMessage(message))
 
     const textPart = await this.partService.create({
       messageId: message.id,
@@ -195,11 +196,12 @@ export class SessionProcessorService {
         id: message.id,
         content: buffered,
       })
-      this.eventService.emit("message.updated", {
+      this.eventService.emit("message.updated", toMessage({
         ...message,
         content: buffered,
         time_completed: completedAt,
-      })
+        updated_at: completedAt,
+      }))
     }
 
     return { message, textPart, appendText, complete }
