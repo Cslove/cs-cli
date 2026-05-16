@@ -579,7 +579,6 @@ export function PromptInput(props: PromptInputProps) {
         </Box>
       </Box>
 
-      {/* 底部提示行 */}
       <Box
         width="100%"
         flexDirection="row"

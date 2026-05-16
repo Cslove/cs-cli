@@ -12,6 +12,7 @@ import { useToast } from "../context/toast.js"
 import { useLocal } from "../context/local.js"
 import { useEvent } from "../context/event.js"
 import { usePromptRef } from "../context/prompt-ref.js"
+import { useKeybind } from "../context/keybind.js"
 import { useTerminalSize } from "../hook/useTerminalSize.js"
 import { SessionSidebar } from "./SessionSidebar.js"
 import { SubagentFooter } from "./SubagentFooter.js"
@@ -19,7 +20,6 @@ import { PermissionPrompt, QuestionPrompt } from "./PermissionPrompt.js"
 import { UserMessage } from "./UserMessage.js"
 import { AssistantMessage, AssistantContextProvider } from "./AssistantMessage.js"
 import type { AssistantContext } from "./AssistantMessage.js"
-import { StatusBar } from "./StatusBar.js"
 import { PromptInput } from "./PromptInput.js"
 import { Scrollbox } from "./Scrollbox.js"
 import type { ScrollboxHandle } from "./Scrollbox.js"
@@ -37,6 +37,7 @@ export function ChatView({ model }: { model?: string }) {
   const local = useLocal()
   const event = useEvent()
   const promptRef = usePromptRef()
+  const keybind = useKeybind()
 
   const sessionID = route.type === "session" ? route.sessionId : undefined
 
@@ -194,17 +195,29 @@ export function ChatView({ model }: { model?: string }) {
     })
   }
 
-  // ---- 状态（agent/model） ----
-
-  const currentAgent = local.agent.current()
-  const agentName = currentAgent?.name
-  const currentModel = local.model.current()
-  const modelName = currentModel?.modelID ?? model ?? "default"
+  // ---- 状态 ----
 
   const sessionStatus = useMemo(() => {
     if (!sessionID) return "idle" as const
     return (sync.data.session_status[sessionID] as "idle" | "working" | "compacting" | undefined) ?? "idle"
   }, [sync.data.session_status, sessionID])
+
+  const promptHint = useMemo(() => {
+    const cmdKey = keybind.print("command_list")
+    return (
+      <Box width="100%" flexDirection="row" justifyContent="space-between">
+        <Box>
+          {sessionStatus === "working" && (
+            <Text color={theme.warning}>⟳ thinking…</Text>
+          )}
+        </Box>
+        <Text>
+          <Text color={theme.text}>{cmdKey}</Text>
+          <Text dimColor color={theme.textMuted}> Commands</Text>
+        </Text>
+      </Box>
+    )
+  }, [sessionStatus, keybind])
 
   // ---- 命令注册 ----
 
@@ -386,9 +399,6 @@ export function ChatView({ model }: { model?: string }) {
       <Box flexDirection="row" flexGrow={1} paddingLeft={2} paddingRight={2} paddingBottom={1} width="100%">
         {/* 主内容区 */}
         <Box flexDirection="column" flexGrow={1} gap={1} width="100%">
-          {/* Status 栏 */}
-          <StatusBar model={modelName} loading={false} status={sessionStatus} agent={agentName} />
-
           {/* 消息区域：Scrollbox 底部粘滞 + 可滚动 */}
           <Scrollbox ref={scrollRef} flexGrow={1} sticky stickyStart="bottom" scrollbar={showScrollbar} keyboard={!autocompleteFocused}>
             {messages.map((msg, idx) => {
@@ -474,7 +484,7 @@ export function ChatView({ model }: { model?: string }) {
                 visible={visible}
                 disabled={disabled}
                 sessionID={sessionID}
-                hint={null}
+                hint={promptHint}
                 onAutocompleteFocusChange={setAutocompleteFocused}
               />
             )}

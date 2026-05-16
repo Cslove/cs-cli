@@ -78,7 +78,7 @@ export function UserMessage({ message, parts, index, showTimestamps }: UserMessa
         width="100%"
         backgroundColor={t.backgroundPanel}
       >
-        <Box flexDirection="column">
+        <Box flexDirection="column" width="100%">
           {/* 文本内容 */}
           {textContent && (
             <Text color={t.text}>{textContent}</Text>
@@ -101,9 +101,11 @@ export function UserMessage({ message, parts, index, showTimestamps }: UserMessa
 
           {/* Footer：时间戳 */}
           {showTimestamps && message.time && (
-            <Text color={t.textMuted} dimColor>
-              {formatTime(message.time.created)}
-            </Text>
+            <Box alignSelf="flex-end" paddingRight={1}>
+              <Text color={t.textMuted} dimColor>
+                {formatTime(message.time.created)}
+              </Text>
+            </Box>
           )}
         </Box>
       </Box>
