@@ -26,11 +26,7 @@ import type { PartInput, AgentPartInput, FilePartInput } from "../../shared/type
 
 // ---- Placeholders ----
 
-const PLACEHOLDERS = [
-  "Fix a TODO in the codebase",
-  "What is the tech stack of this project?",
-  "Fix broken tests",
-]
+const PLACEHOLDERS = ["Fix a TODO in the codebase", "What is the tech stack of this project?", "Fix broken tests"]
 
 // ---- Stash (跨路由保存未提交输入，对标 opencode 的 let stashed) ----
 
@@ -78,18 +74,16 @@ function buildSegments(input: string, mentions: MentionSpan[]): RenderSegment[] 
 // 彻底消除 yoga 坐标换算导致的定位偏差问题
 // 光标随文本一起渲染 → 位置永远正确、换行自然跟随、无坐标计算开销
 
-function renderSegmentsWithCursor(
-  segments: RenderSegment[],
-  input: string,
-  cursor: number,
-): React.ReactNode[] {
+function renderSegmentsWithCursor(segments: RenderSegment[], input: string, cursor: number): React.ReactNode[] {
   const elements: React.ReactNode[] = []
   let keyIdx = 0
 
   const segProps = (type: string) =>
-    type === "agent" ? { color: theme.background, backgroundColor: theme.accent }
-    : type === "file" ? { color: theme.text, backgroundColor: theme.primary }
-    : { color: theme.text }
+    type === "agent"
+      ? { color: theme.background, backgroundColor: theme.accent }
+      : type === "file"
+        ? { color: theme.text, backgroundColor: theme.primary }
+        : { color: theme.text }
 
   for (const seg of segments) {
     if (cursor >= seg.start && cursor < seg.end) {
@@ -99,18 +93,40 @@ function renderSegmentsWithCursor(
       const ch = seg.text[local] ?? " "
       const after = seg.text.slice(local + 1)
       const style = segProps(seg.type)
-      if (before) elements.push(<Text key={keyIdx++} {...style}>{before}</Text>)
-      elements.push(<Text key={keyIdx++} color={theme.background} backgroundColor={theme.text}>{ch}</Text>)
-      if (after) elements.push(<Text key={keyIdx++} {...style}>{after}</Text>)
+      if (before)
+        elements.push(
+          <Text key={keyIdx++} {...style}>
+            {before}
+          </Text>,
+        )
+      elements.push(
+        <Text key={keyIdx++} color={theme.background} backgroundColor={theme.text}>
+          {ch}
+        </Text>,
+      )
+      if (after)
+        elements.push(
+          <Text key={keyIdx++} {...style}>
+            {after}
+          </Text>,
+        )
     } else {
       // 光标不在本段，原样渲染
-      elements.push(<Text key={keyIdx++} {...segProps(seg.type)}>{seg.text}</Text>)
+      elements.push(
+        <Text key={keyIdx++} {...segProps(seg.type)}>
+          {seg.text}
+        </Text>,
+      )
     }
   }
 
   // 光标在输入末尾（追加位置）——渲染一个反色空格
   if (cursor === input.length) {
-    elements.push(<Text key={keyIdx++} color={theme.background} backgroundColor={theme.text}>{" "}</Text>)
+    elements.push(
+      <Text key={keyIdx++} color={theme.background} backgroundColor={theme.text}>
+        {" "}
+      </Text>,
+    )
   }
 
   return elements
@@ -260,106 +276,122 @@ export function PromptInput(props: PromptInputProps) {
 
   // ---- 提交逻辑 ----
   // 对标 opencode submit()：将输入态的虚拟文本 + mention spans 转换为扁平化 parts 数组
-  const handleSubmit = useCallback(async (text: string) => {
-    if (submitted.current) return
-    if (props.disabled) return
-    if (autocomplete.visible) return
-    const trimmed = text.trim()
-    if (!trimmed) return
+  const handleSubmit = useCallback(
+    async (text: string) => {
+      if (submitted.current) return
+      if (props.disabled) return
+      if (autocomplete.visible) return
+      const trimmed = text.trim()
+      if (!trimmed) return
 
-    // 快捷退出
-    if (trimmed === "exit" || trimmed === "quit" || trimmed === ":q") {
-      exit()
-      return
-    }
+      // 快捷退出
+      if (trimmed === "exit" || trimmed === "quit" || trimmed === ":q") {
+        exit()
+        return
+      }
 
-    submitted.current = true
-    inputRef.current = ""
-    cursorRef.current = 0
-    syncRender()
+      submitted.current = true
+      inputRef.current = ""
+      cursorRef.current = 0
+      syncRender()
 
-    // === 数据转换：对标 opencode submit() Phase 3 ===
-    // 1. 从 mention spans 构建 agent/file parts
-    // 2. 从输入文本构建 text part
-    // 3. 构建 parts 数组传给 sendMessage
-    const mentions = autocomplete.mentions
-    const parts: PartInput[] = []
-    let inputText = text
+      // === 数据转换：对标 opencode submit() Phase 3 ===
+      // 1. 从 mention spans 构建 agent/file parts
+      // 2. 从输入文本构建 text part
+      // 3. 构建 parts 数组传给 sendMessage
+      const mentions = autocomplete.mentions
+      const parts: PartInput[] = []
+      let inputText = text
 
-    if (mentions.length > 0) {
-      // 对标 opencode：从后往前将 mention 的虚拟文本从 inputText 中剥离
-      // 因为 mention 文本（如 "@Code"）是虚拟占位，实际内容由 part 携带
-      // 剥离后 inputText 只剩普通文本部分
-      const sorted = [...mentions].sort((a, b) => b.start - a.start)
+      if (mentions.length > 0) {
+        // 对标 opencode：从后往前将 mention 的虚拟文本从 inputText 中剥离
+        // 因为 mention 文本（如 "@Code"）是虚拟占位，实际内容由 part 携带
+        // 剥离后 inputText 只剩普通文本部分
+        const sorted = [...mentions].sort((a, b) => b.start - a.start)
 
-      for (const mention of sorted) {
-        // 从后往前剥离 mention 文本 + 尾部空格
-        const hasTrailingSpace = inputText[mention.end] === " "
-        const deleteEnd = hasTrailingSpace ? mention.end + 1 : mention.end
-        inputText = inputText.slice(0, mention.start) + inputText.slice(deleteEnd)
+        for (const mention of sorted) {
+          // 从后往前剥离 mention 文本 + 尾部空格
+          const hasTrailingSpace = inputText[mention.end] === " "
+          const deleteEnd = hasTrailingSpace ? mention.end + 1 : mention.end
+          inputText = inputText.slice(0, mention.start) + inputText.slice(deleteEnd)
 
-        // 构建 part（对标 opencode 的 nonTextParts）
-        if (mention.type === "agent") {
-          const agentPart: AgentPartInput = {
-            type: "agent",
-            name: mention.text.slice(1), // 去掉 "@" 前缀
-            source: {
-              value: mention.text,
-              start: mention.start,
-              end: mention.end,
-            },
-          }
-          parts.push(agentPart)
-        } else if (mention.type === "file") {
-          const filePath = mention.text.slice(1) // 去掉 "@" 前缀
-          const filePart: FilePartInput = {
-            type: "file",
-            mime: "text/plain", // 文件引用默认 text/plain
-            url: filePath,
-            source: {
-              path: filePath,
-              text: {
+          // 构建 part（对标 opencode 的 nonTextParts）
+          if (mention.type === "agent") {
+            const agentPart: AgentPartInput = {
+              type: "agent",
+              name: mention.text.slice(1), // 去掉 "@" 前缀
+              source: {
                 value: mention.text,
                 start: mention.start,
                 end: mention.end,
               },
-            },
+            }
+            parts.push(agentPart)
+          } else if (mention.type === "file") {
+            const filePath = mention.text.slice(1) // 去掉 "@" 前缀
+            const filePart: FilePartInput = {
+              type: "file",
+              mime: "text/plain", // 文件引用默认 text/plain
+              url: filePath,
+              source: {
+                path: filePath,
+                text: {
+                  value: mention.text,
+                  start: mention.start,
+                  end: mention.end,
+                },
+              },
+            }
+            parts.push(filePart)
           }
-          parts.push(filePart)
         }
       }
-    }
 
-    // 对标 opencode：用户输入文本作为 text part 放在 parts 最前面
-    parts.unshift({ type: "text", text: inputText })
+      // 对标 opencode：用户输入文本作为 text part 放在 parts 最前面
+      parts.unshift({ type: "text", text: inputText })
 
-    // 对标 opencode：agent 信息传入请求
-    const agentName = local.agent.current()?.name
+      // 对标 opencode：agent 信息传入请求
+      const agentName = local.agent.current()?.name
 
-    promptHistory.append({ input: trimmed, parts })
-    debug.log("Input: ", { input: trimmed, parts })
+      promptHistory.append({ input: trimmed, parts })
+      debug.log("Input: ", { input: trimmed, parts })
 
-    try {
-      let sessionID = props.sessionID
-      if (sessionID == null) {
-        const session = await createSession()
-        sessionID = session.id
+      try {
+        let sessionID = props.sessionID
+        if (sessionID == null) {
+          const session = await createSession()
+          sessionID = session.id
+        }
+
+        await sendMessage(inputText, agentName, parts, sessionID)
+
+        if (!props.sessionID) {
+          setTimeout(() => {
+            navigate({ type: "session", sessionId: sessionID })
+          }, 50)
+        }
+      } catch (e) {
+        toast.error(e)
+      } finally {
+        submitted.current = false
+        props.onSubmit?.()
       }
-
-      await sendMessage(inputText, agentName, parts, sessionID)
-
-      if (!props.sessionID) {
-        setTimeout(() => {
-          navigate({ type: "session", sessionId: sessionID })
-        }, 50)
-      }
-    } catch (e) {
-      toast.error(e)
-    } finally {
-      submitted.current = false
-      props.onSubmit?.()
-    }
-  }, [props.disabled, props.onSubmit, createSession, navigate, sendMessage, toast, promptHistory, exit, syncRender, autocomplete.mentions, local])
+    },
+    [
+      props.disabled,
+      props.sessionID,
+      props.onSubmit,
+      createSession,
+      navigate,
+      sendMessage,
+      toast,
+      promptHistory,
+      exit,
+      syncRender,
+      autocomplete.mentions,
+      local,
+    ],
+  )
 
   // ---- 绑定 PromptRef，让外部可以操作输入框 ----
   // 注意：这里读取 inputRef 而非 displayInput，确保外部拿到的是最新值
@@ -369,7 +401,9 @@ export function PromptInput(props: PromptInputProps) {
   useEffect(() => {
     promptRefSet({
       focused: true,
-      get current() { return inputRef.current },
+      get current() {
+        return inputRef.current
+      },
       set(ref: string | { input?: string }) {
         const value = typeof ref === "string" ? ref : (ref.input ?? "")
         inputRef.current = value
@@ -554,24 +588,34 @@ export function PromptInput(props: PromptInputProps) {
       >
         <Box flexDirection="column">
           <Box ref={textRef}>
-          {input ? (
-            <Text>{renderSegmentsWithCursor(segments, input, cursor)}</Text>
-          ) : (
-            <Text>
-              <Text color={theme.background} backgroundColor={theme.text}>{" "}</Text>
-              <Text dimColor color={theme.textMuted}>{placeholderText}</Text>
-            </Text>
-          )}
+            {input ? (
+              <Text>{renderSegmentsWithCursor(segments, input, cursor)}</Text>
+            ) : (
+              <Text>
+                <Text color={theme.background} backgroundColor={theme.text}>
+                  {" "}
+                </Text>
+                <Text dimColor color={theme.textMuted}>
+                  {placeholderText}
+                </Text>
+              </Text>
+            )}
           </Box>
           {/* agent/model 信息：输入框内部左下角 */}
           <Box flexDirection="row" gap={1} paddingTop={1}>
             <Text color={theme.secondary}>{agentName}</Text>
-            <Text dimColor color={theme.textMuted}>·</Text>
-            <Text dimColor color={theme.textMuted}>{modelName}</Text>
+            <Text dimColor color={theme.textMuted}>
+              ·
+            </Text>
+            <Text dimColor color={theme.textMuted}>
+              {modelName}
+            </Text>
             {/* 右侧额外内容 */}
             {props.right && (
               <>
-                <Text dimColor color={theme.textMuted}>·</Text>
+                <Text dimColor color={theme.textMuted}>
+                  ·
+                </Text>
                 {props.right}
               </>
             )}
@@ -586,15 +630,25 @@ export function PromptInput(props: PromptInputProps) {
         paddingTop={1}
         backgroundColor={theme.background}
       >
-        {props.hint !== undefined ? props.hint : (
+        {props.hint !== undefined ? (
+          props.hint
+        ) : (
           <Box flexDirection="column" gap={1} width="100%">
             <Box flexDirection="row" justifyContent="space-between">
-              <Text dimColor color={theme.textMuted}>ctrl+n  New session</Text>
-              <Text dimColor color={theme.textMuted}>ctrl+p  Commands</Text>
+              <Text dimColor color={theme.textMuted}>
+                ctrl+n New session
+              </Text>
+              <Text dimColor color={theme.textMuted}>
+                ctrl+p Commands
+              </Text>
             </Box>
             <Box flexDirection="row" justifyContent="space-between">
-              <Text dimColor color={theme.textMuted}>ctrl+l  Sessions</Text>
-              <Text dimColor color={theme.textMuted}>ctrl+m  Switch model</Text>
+              <Text dimColor color={theme.textMuted}>
+                ctrl+l Sessions
+              </Text>
+              <Text dimColor color={theme.textMuted}>
+                ctrl+m Switch model
+              </Text>
             </Box>
           </Box>
         )}

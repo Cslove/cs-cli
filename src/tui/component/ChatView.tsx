@@ -31,10 +31,14 @@ export function ChatView({ model }: { model?: string }) {
   const { columns } = useTerminalSize()
   const keybind = useKeybind()
 
+  const scrollRef = useRef<ScrollboxHandle>(null)
+  const prevMsgCount = useRef(0)
+
   const sessionID = route.type === "session" ? route.sessionId : undefined
 
   useEffect(() => {
     if (sessionID) {
+      scrollRef.current?.scrollToBottom()
       void sync.session.sync(sessionID)
     }
   }, [sessionID, sync.session])
@@ -88,9 +92,6 @@ export function ChatView({ model }: { model?: string }) {
   const [showDetails, setShowDetails] = useState(kv.get<boolean>("tool_details_visibility", true))
   const [showScrollbar, setShowScrollbar] = useState(true)
   const [autocompleteFocused, setAutocompleteFocused] = useState(false)
-
-  const scrollRef = useRef<ScrollboxHandle>(null)
-  const prevMsgCount = useRef(0)
 
   // 用户提交消息后滚动到列表底部
   useEffect(() => {
