@@ -429,7 +429,7 @@ export function ChatView({ model }: { model?: string }) {
 
   return (
     <AssistantContextProvider value={assistantContext}>
-      <Box flexDirection="row" flexGrow={1} paddingLeft={2} paddingRight={2} paddingBottom={1} width="100%">
+      <Box flexDirection="row" flexGrow={1} paddingLeft={2} paddingRight={2} paddingBottom={1} paddingTop={1} width="100%">
         {/* 主内容区 */}
         <Box flexDirection="column" flexGrow={1} gap={1} width="100%">
           {/* 消息区域：Scrollbox 底部粘滞 + 可滚动 */}

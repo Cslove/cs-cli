@@ -536,8 +536,8 @@ export function PromptInput(props: PromptInputProps) {
     const node = textRef.current
     if (!node?.yogaNode) return
     const pos = getAbsolutePosition(node)
-    setCursorPosition({ x: pos.x - 2, y: pos.y })
-  }, [columns, props.visible, props.disabled, dialog.isEmpty])
+    setCursorPosition(props.hint ? { x: pos.x - 4, y: pos.y - 1 } : { x: pos.x - 2, y: pos.y })
+  }, [columns, props.visible, props.disabled, dialog.isEmpty, props.hint])
 
   // Ink 的 setCursorPosition 会附带 \x1B[?25h（显示光标块），
   // 在 layout effect 中立即写入 hide 序列，隐藏终端光标块但保留位置给 IME
