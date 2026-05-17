@@ -1,12 +1,18 @@
 // 对标 opencode session/index.tsx 的 AssistantMessage 渲染
 import React, { useMemo } from "react"
 import { Box, Text } from "ink"
+import Markdown from "ink-markdown-es"
+import { createShikiCodeRenderer } from "ink-shiki-code"
 import { theme } from "../context/theme.js"
 import { useSync } from "../context/sync.js"
 import { useLocal } from "../context/local.js"
 import { useKeybind } from "../context/keybind.js"
 import { ToolRenderer } from "./ToolRenderer.js"
 import type { Message, RenderPart, TextPart, ReasoningPart, ToolPart } from "../../shared/types.js"
+
+// ---- Shiki 代码高亮渲染器（模块级单例，保持引用稳定） ----
+
+const codeRenderer = createShikiCodeRenderer({ theme: "one-dark-pro" })
 
 // ---- Context（从 ChatView 传递下来） ----
 
@@ -159,17 +165,36 @@ function PartDisplay({ part, isLast }: { part: RenderPart; isLast: boolean }) {
   }
 }
 
-// ---- 文本 Part ----
+// ---- 文本 Part（Markdown + 代码高亮） ----
 
 function TextPartDisplay({ part }: { part: TextPart }) {
-  const ctx = useAssistantContext()
   const text = part.text.trim()
   if (!text) return null
 
-  // 简单 Markdown-ish 渲染
   return (
-    <Box paddingLeft={3} marginTop={1} flexShrink={0}>
-      <Text color={theme.text}>{text}</Text>
+    <Box paddingLeft={3} marginTop={1} flexShrink={0} flexDirection="column">
+      <Markdown
+        styles={{
+          h1: { color: theme.markdownHeading, bold: true },
+          h2: { color: theme.markdownHeading, bold: true },
+          h3: { color: theme.markdownHeading, bold: true },
+          h4: { color: theme.markdownHeading, bold: true },
+          h5: { color: theme.markdownHeading, bold: true },
+          h6: { color: theme.markdownHeading, bold: true },
+          paragraph: { color: theme.text },
+          strong: { color: theme.markdownStrong, bold: true },
+          em: { color: theme.markdownEmph },
+          codespan: { color: theme.markdownCode, backgroundColor: theme.backgroundPanel },
+          code: { color: theme.markdownCode, backgroundColor: theme.backgroundPanel },
+          link: { color: theme.markdownLink },
+          blockquote: { color: theme.markdownBlockQuote },
+          listItem: { color: theme.text, bullet: "·" },
+        }}
+        renderers={{ code: codeRenderer }}
+        showSharp={false}
+      >
+        {text}
+      </Markdown>
     </Box>
   )
 }
