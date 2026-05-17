@@ -42,118 +42,41 @@ export class LlmService {
     // 取最后一条 user 消息作为 mock echo 内容；找不到就给一段默认文案
     const lastUser = [...options.messages].reverse().find((m) => m.role === "user")
     const mockReply = lastUser
-      ? `## 关于「${lastUser.content.slice(0, 40)}${lastUser.content.length > 40 ? "…" : ""}」的回复
+      ? `## ${lastUser.content.slice(0, 40)}${lastUser.content.length > 40 ? "…" : ""}
 
-这是一条用于**联调测试**的模拟回复，包含各类 Markdown 语法和 TypeScript 代码示例。
+这是一条**联调测试**回复，覆盖常见 Markdown 语法。
 
-### Markdown 基础
+### 基础语法
 
-- **加粗文字** — \`theme.markdownStrong\` 色值
-- *斜体文字* — \`theme.markdownEmph\` 色值
-- \`行内代码\` — \`theme.markdownCode\` 色值
-- [链接示例](https://example.com) — \`theme.markdownLink\` 色值
+- **加粗** 与 *斜体*
+- \`行内代码\` 与 [链接](https://example.com)
 
-> 这是一个引用块，使用 \`theme.markdownBlockQuote\` 颜色渲染。
-> 可以用在提示、引用等场景。
+> 引用块 —— 提示或引用场景
 
-### TypeScript 代码示例
-
-下面是一个服务层的代码块，展示依赖注入和 CRUD 操作：
+### 代码块
 
 \`\`\`typescript
-import { Provide, Scope, ScopeEnum, Inject } from "@midwayjs/core"
-
-interface User {
-  id: string
-  name: string
-  email: string
-  createdAt: number
-}
+import { Provide, Scope, ScopeEnum } from "@midwayjs/core"
 
 @Provide()
 @Scope(ScopeEnum.Singleton)
-export class UserService {
-  private users: Map<string, User> = new Map()
-
-  async findById(id: string): Promise<User | undefined> {
-    return this.users.get(id)
+export class DemoService {
+  async greet(name: string): Promise<string> {
+    return \`Hello, \${name}!\`
   }
-
-  async create(input: { name: string; email: string }): Promise<User> {
-    const user: User = {
-      id: crypto.randomUUID(),
-      name: input.name,
-      email: input.email,
-      createdAt: Date.now(),
-    }
-    this.users.set(user.id, user)
-    return user
-  }
-
-  async list(): Promise<User[]> {
-    return Array.from(this.users.values()).sort(
-      (a, b) => b.createdAt - a.createdAt
-    )
-  }
-}
-\`\`\`
-
-### Hook 示例
-
-下面是一个 React Hook 示例，展示 \`useEffect\` + \`useRef\` 配合滚动监听：
-
-\`\`\`typescript
-import { useEffect, useRef } from "react"
-
-function useScrollToBottom(deps: unknown[]) {
-  const prevCount = useRef(0)
-
-  useEffect(() => {
-    const count = Array.isArray(deps[0]) ? deps[0].length : 0
-    if (count > prevCount.current && prevCount.current > 0) {
-      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" })
-    }
-    prevCount.current = count
-  }, deps)
-}
-\`\`\`
-
-### 有序列表
-
-1. 第一步：安装依赖 \`npm install\`
-2. 第二步：启动服务 \`npm run dev\`
-3. 第三步：打开终端 TUI \`cs chat\`
-
-### 表格
-
-| 属性 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| \`id\` | string | ✅ | 唯一标识 |
-| \`name\` | string | ✅ | 用户名 |
-| \`email\` | string | ❌ | 邮箱地址 |
-| \`role\` | enum | ✅ | 角色类型 |
-
----
-
-src/
-├── controller/   # 控制器（路由）
-├── service/      # 业务逻辑
-├── entity/       # 数据模型
-├── config/       # 配置
-└── configuration.ts  # 生命周期配置
-
-以上是模拟回复的全部内容。当前模型：**${options.model ?? "default"}**。`
-      : `## Mock 回复
-
-这是一条**模拟回复**，包含 Markdown 语法和 TypeScript 代码块用于联调测试。
-
-\`\`\`typescript
-function hello() {
-  console.log("Hello from mock LLM!")
 }
 \`\`\`
 
 当前模型：**${options.model ?? "default"}**。`
+      : `## Mock 回复
+
+**加粗**、*斜体*、\`行内代码\`。
+
+\`\`\`typescript
+console.log("Hello from mock!")
+\`\`\`
+
+模型：**${options.model ?? "default"}**。`
 
     // 按空格+换行边界切 token，间隔 10ms 模拟流式（word 级别避免过长）
     const tokens = mockReply.match(/\S+\s*/g) ?? Array.from(mockReply)
@@ -164,7 +87,7 @@ function hello() {
         const timer = setTimeout(() => {
           options.signal?.removeEventListener("abort", onAbort)
           resolve()
-        }, 10)
+        }, 30)
         const onAbort = () => {
           clearTimeout(timer)
           resolve()

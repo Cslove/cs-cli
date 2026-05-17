@@ -195,12 +195,14 @@ export class SessionProcessorService {
       await this.sessionService.updateAssistantCompletion({
         id: message.id,
         content: buffered,
+        finish: "stop",
       })
       this.eventService.emit("message.updated", toMessage({
         ...message,
         content: buffered,
         time_completed: completedAt,
         updated_at: completedAt,
+        finish: "stop",
       }))
     }
 
