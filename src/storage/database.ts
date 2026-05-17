@@ -157,6 +157,7 @@ function runMigrations() {
       tool_name TEXT NOT NULL DEFAULT '',
       tool_input TEXT NOT NULL DEFAULT '',
       tool_output TEXT NOT NULL DEFAULT '',
+      metadata TEXT NOT NULL DEFAULT '{}',
       created_at INTEGER NOT NULL
     );
   `)
@@ -185,6 +186,7 @@ function runMigrations() {
   try { db.run("ALTER TABLE session ADD COLUMN parent_id TEXT DEFAULT NULL") } catch {}
   // 旧表列名 project_path → project_id，新表 CREATE TABLE 已用 project_id
   try { db.run("ALTER TABLE session RENAME COLUMN project_path TO project_id") } catch {}
+  try { db.run("ALTER TABLE part ADD COLUMN metadata TEXT NOT NULL DEFAULT '{}'") } catch {}
 
   saveDatabase()
 }

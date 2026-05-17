@@ -6,5 +6,6 @@ export interface PartEntity {
   tool_name: string
   tool_input: string
   tool_output: string
+  metadata: string
   created_at: number
 }

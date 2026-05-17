@@ -3,7 +3,7 @@
 import React, { useMemo } from "react"
 import { Box, Text } from "ink"
 import { theme as t } from "../context/theme.js"
-import type { Message, RenderPart, TextPart, FilePart } from "../../shared/types.js"
+import type { Message, RenderPart, TextPart, FilePart, AgentRenderPart } from "../../shared/types.js"
 
 // ---- MIME 缩写 ----
 
@@ -52,6 +52,11 @@ export function UserMessage({ message, parts, index, showTimestamps }: UserMessa
     return parts.filter((p): p is FilePart => p.type === "file")
   }, [parts])
 
+  // 提取 agent 提及（对标输入中的 @Code 徽标）
+  const agents = useMemo(() => {
+    return parts.filter((p): p is AgentRenderPart => p.type === "agent")
+  }, [parts])
+
   const agentColor = t.secondary
 
   if (!textContent) {
@@ -79,6 +84,18 @@ export function UserMessage({ message, parts, index, showTimestamps }: UserMessa
         backgroundColor={t.backgroundPanel}
       >
         <Box flexDirection="column" width="100%">
+          {/* Agent 提及徽标（对标输入中 @Name 着色效果） */}
+          {agents.length > 0 && (
+            <Box flexDirection="row" paddingBottom={1}>
+              {agents.map((agent, i) => (
+                <Text key={i}>
+                  <Text backgroundColor={t.accent} color={t.background}> @{agent.name} </Text>
+                  {i < agents.length - 1 && <Text> </Text>}
+                </Text>
+              ))}
+            </Box>
+          )}
+
           {/* 文本内容 */}
           {textContent && (
             <Text color={t.text}>{textContent}</Text>

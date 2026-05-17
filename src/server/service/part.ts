@@ -31,6 +31,7 @@ export class PartService {
     text?: string
     tool_name?: string
     tool_input?: string
+    metadata?: string
   }): Promise<PartEntity> {
     const part: PartEntity = {
       id: uuid(),
@@ -40,12 +41,13 @@ export class PartService {
       tool_name: input.tool_name ?? "",
       tool_input: input.tool_input ?? "",
       tool_output: "",
+      metadata: input.metadata ?? "{}",
       created_at: Date.now(),
     }
     const db = getDb()
     db.run(
-      "INSERT INTO part (id, message_id, type, text, tool_name, tool_input, tool_output, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      [part.id, part.message_id, part.type, part.text, part.tool_name, part.tool_input, part.tool_output, part.created_at],
+      "INSERT INTO part (id, message_id, type, text, tool_name, tool_input, tool_output, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [part.id, part.message_id, part.type, part.text, part.tool_name, part.tool_input, part.tool_output, part.metadata, part.created_at],
     )
     scheduleSave()
     return part

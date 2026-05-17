@@ -30,17 +30,19 @@ function buildPartCreateArgs(part: PartInput): {
   text: string
   tool_name?: string
   tool_input?: string
+  metadata: string
 } {
   switch (part.type) {
     case "text":
-      return { type: "text", text: part.text }
+      return { type: "text", text: part.text, metadata: JSON.stringify({ synthetic: part.synthetic ?? false }) }
     case "agent":
-      return { type: "agent", text: part.name }
+      return { type: "agent", text: part.name, metadata: JSON.stringify(part.source ? { source: part.source } : {}) }
     case "file":
       return {
         type: "file",
-        text: part.source?.path ?? part.filename ?? "",
+        text: part.filename ?? part.url,
         tool_input: part.url,
+        metadata: JSON.stringify({ mime: part.mime, filename: part.filename, url: part.url, source: part.source }),
       }
     default: {
       // exhaustive check：未来 PartInput 增加新类型时编译期立即暴露

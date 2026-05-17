@@ -155,8 +155,17 @@ export interface FilePart {
   url: string
 }
 
+/** 用于渲染 agent mention 徽标（如 @Code） */
+export interface AgentRenderPart {
+  id: string
+  sessionID?: string
+  messageID?: string
+  type: "agent"
+  name: string
+}
+
 /** 渲染用的 Part 联合类型 */
-export type RenderPart = TextPart | ToolPart | ReasoningPart | FilePart
+export type RenderPart = TextPart | ToolPart | ReasoningPart | FilePart | AgentRenderPart
 
 // ---- 对标 opencode SDK 的 PartInput 类型（提交时使用，不含 id/sessionID/messageID） ----
 

@@ -19,7 +19,7 @@ import type { AssistantContext } from "./AssistantMessage.js"
 import { PromptInput } from "./PromptInput.js"
 import { Scrollbox } from "./Scrollbox.js"
 import type { ScrollboxHandle } from "./Scrollbox.js"
-import type { RenderPart, TextPart, ToolPart, Message } from "../../shared/types.js"
+import type { RenderPart, TextPart, ToolPart, FilePart, AgentRenderPart, Message } from "../../shared/types.js"
 
 export function ChatView({ model }: { model?: string }) {
   const { route, navigate } = useRoute()
@@ -173,8 +173,11 @@ export function ChatView({ model }: { model?: string }) {
 
   function getParts(msgID: string): RenderPart[] {
     const raw = partsMap[msgID] ?? []
-    return raw.map((p) => {
+    return raw.flatMap((p) => {
       const base = { id: p.id, sessionID, messageID: msgID }
+      let meta: Record<string, unknown> = {}
+      try { meta = JSON.parse((p as { metadata?: string }).metadata ?? "{}") } catch {}
+
       if (p.type === "text" || p.type === "reasoning") {
         return { ...base, type: p.type, text: p.text ?? "" } as unknown as RenderPart
       }
@@ -189,6 +192,22 @@ export function ChatView({ model }: { model?: string }) {
           input: tp.input as Record<string, unknown> | undefined,
           metadata: tp.metadata as Record<string, unknown> | undefined,
         } as ToolPart
+      }
+      if (p.type === "file") {
+        return {
+          ...base,
+          type: "file" as const,
+          mime: (meta.mime as string) ?? "text/plain",
+          filename: (meta.filename as string) ?? undefined,
+          url: (meta.url as string) ?? p.tool_input ?? p.text ?? "",
+        } as FilePart
+      }
+      if (p.type === "agent") {
+        return {
+          ...base,
+          type: "agent" as const,
+          name: p.text ?? "",
+        } as AgentRenderPart
       }
       return { ...base, type: "text" as const, text: p.text ?? "" } as TextPart
     })
