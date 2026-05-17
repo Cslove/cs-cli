@@ -67,7 +67,7 @@ export function AssistantMessage({ message, parts, isLast }: AssistantMessagePro
 
   const agentColor = useMemo(() => {
     const agent = local.agent.list().find(a => a.name === message.agent)
-    return agent ? theme.primary : theme.accent
+    return agent ? theme.secondary : theme.accent
   }, [local, message.agent])
 
   const final = useMemo(() => {
@@ -125,7 +125,7 @@ export function AssistantMessage({ message, parts, isLast }: AssistantMessagePro
             <Text color={message.error?.name === "MessageAbortedError" ? theme.textMuted : agentColor}>
               ▣{" "}
             </Text>
-            <Text color={theme.text}>{message.mode ? titlecase(message.mode) : "Assistant"}</Text>
+            <Text color={theme.text}>{message.agent}</Text>
             <Text color={theme.textMuted}> · {modelName}</Text>
             {formattedDuration && (
               <Text color={theme.textMuted}> · {formattedDuration}</Text>
