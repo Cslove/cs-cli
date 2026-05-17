@@ -180,6 +180,7 @@ export function useAutocomplete(opts: UseAutocompleteOptions): UseAutocompleteRe
   const selectedIndexRef = useRef(0)
   // base options 缓存：show() 时计算，searchQuery 变化时仅做 filter
   const baseOptionsRef = useRef<AutocompleteOption[]>([])
+  const visibleOptionsRef = useRef<AutocompleteOption[]>([])
   const searchQueryRef = useRef("")
 
   // ---- Mention spans（对标 opencode prompt.parts + extmarks） ----
@@ -350,6 +351,7 @@ export function useAutocomplete(opts: UseAutocompleteOptions): UseAutocompleteRe
       : buildCommandOptions()
 
     baseOptionsRef.current = base
+    visibleOptionsRef.current = base
     setVisible(mode)
     setOptions(base)
     setSelectedIndex(0)
@@ -362,6 +364,7 @@ export function useAutocomplete(opts: UseAutocompleteOptions): UseAutocompleteRe
     setVisible(false)
     searchQueryRef.current = ""
     baseOptionsRef.current = []
+    visibleOptionsRef.current = []
     setOptions([])
     setSelectedIndex(0)
   }
@@ -369,7 +372,7 @@ export function useAutocomplete(opts: UseAutocompleteOptions): UseAutocompleteRe
   // ---- Navigation ----
 
   function move(direction: -1 | 1) {
-    const len = baseOptionsRef.current.length
+    const len = visibleOptionsRef.current.length
     if (len === 0) return
     let next = selectedIndexRef.current + direction
     if (next < 0) next = len - 1
@@ -378,8 +381,7 @@ export function useAutocomplete(opts: UseAutocompleteOptions): UseAutocompleteRe
   }
 
   function select() {
-    const selected = baseOptionsRef.current[selectedIndexRef.current]
-      ?? options[selectedIndexRef.current]
+    const selected = visibleOptionsRef.current[selectedIndexRef.current]
     if (!selected) return
     hide()
     selected.onSelect()
@@ -395,10 +397,13 @@ export function useAutocomplete(opts: UseAutocompleteOptions): UseAutocompleteRe
     const base = baseOptionsRef.current
     if (!query || base.length === 0) {
       setOptions(base)
+      visibleOptionsRef.current = base
       return
     }
     const filtered = filterOptions(base, query)
-    setOptions(filtered.length > 0 ? filtered : base)
+    const result = filtered
+    visibleOptionsRef.current = result
+    setOptions(result)
     setSelectedIndex(0)
   }
 
