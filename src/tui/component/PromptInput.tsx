@@ -8,7 +8,6 @@
 // 4. useMemo 缓存渲染计算（stringWidth 等）
 import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from "react"
 import { Box, Text, useInput, usePaste, useApp, useCursor } from "ink"
-import stringWidth from "string-width"
 import { useSession } from "../context/session.js"
 import { theme } from "../context/theme.js"
 import { useRoute } from "../context/route.js"
@@ -16,7 +15,6 @@ import { useToast } from "../context/toast.js"
 import { useDialog } from "../context/dialog.js"
 import { usePromptRef } from "../context/prompt-ref.js"
 import { usePromptHistory } from "../context/prompt-history.js"
-import { useSync } from "../context/sync.js"
 import { useLocal } from "../context/local.js"
 import { useTerminalSize } from "../hook/useTerminalSize.js"
 import { useAutocomplete, type MentionSpan } from "../hook/useAutocomplete.js"
@@ -157,31 +155,6 @@ function getAbsolutePosition(inkNode: any): { x: number; y: number } {
   return { x: Math.round(x), y: Math.round(y) }
 }
 
-function getCursorVisualPosition(
-  input: string,
-  cursor: number,
-  contentWidth: number,
-): { xOffset: number; yOffset: number } {
-  if (contentWidth <= 0) return { xOffset: 0, yOffset: 0 }
-  const beforeCursor = input.slice(0, cursor)
-  let currentCol = 0
-  let currentRow = 0
-  for (const char of beforeCursor) {
-    const w = stringWidth(char)
-    if (currentCol + w > contentWidth) {
-      currentRow++
-      currentCol = w
-    } else {
-      currentCol += w
-    }
-  }
-  if (currentCol >= contentWidth) {
-    currentRow++
-    currentCol = 0
-  }
-  return { xOffset: currentCol, yOffset: currentRow }
-}
-
 // ---- Props ----
 
 export interface PromptInputProps {
@@ -209,7 +182,6 @@ export function PromptInput(props: PromptInputProps) {
   const dialog = useDialog()
   const promptRef = usePromptRef()
   const promptHistory = usePromptHistory()
-  const sync = useSync()
   const local = useLocal()
   const { exit } = useApp()
   const { setCursorPosition } = useCursor()
@@ -528,9 +500,6 @@ export function PromptInput(props: PromptInputProps) {
       autocomplete.onInput(inputRef.current, cursorRef.current)
     }
   })
-
-  // ---- IME 光标定位（终端光标服务于输入法候选框） ----
-  const cursorBaseRef = useRef<{ x: number; y: number; contentWidth: number } | null>(null)
 
   useLayoutEffect(() => {
     const node = textRef.current
